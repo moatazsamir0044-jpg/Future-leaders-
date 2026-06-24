@@ -1,0 +1,15 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "if [ ! -x \"$HOME/.claude/skills/gstack/browse/dist/browse\" ]; then mkdir -p $HOME/.claude/skills && curl -fsSL https://github.com/garrytan/gstack/archive/refs/heads/main.tar.gz | tar xz -C /tmp/ && mv /tmp/gstack-main $HOME/.claude/skills/gstack && cd $HOME/.claude/skills/gstack && bash ./setup 2>/dev/null || true; fi"
+          }
+        ]
+      }
+    ]
+  }
+}
