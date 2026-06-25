@@ -46,7 +46,7 @@ export function DashboardCharts({ payrollPeriods, expenseReports }: Props) {
                 <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                 <XAxis dataKey="name" tick={{ fontSize: 11 }} angle={-35} textAnchor="end" interval={0} />
                 <YAxis tick={{ fontSize: 11 }} tickFormatter={v => formatCurrency(v)} width={80} />
-                <Tooltip formatter={(v: number) => `EGP ${formatCurrency(v)}`} />
+                <Tooltip formatter={(v) => `EGP ${formatCurrency(Number(v))}`} />
                 <Legend wrapperStyle={{ paddingTop: 12 }} />
                 <Bar dataKey="Net Salary" fill="#3b82f6" radius={[3, 3, 0, 0]} />
                 <Bar dataKey="Gross Total" fill="#93c5fd" radius={[3, 3, 0, 0]} />
@@ -66,7 +66,7 @@ export function DashboardCharts({ payrollPeriods, expenseReports }: Props) {
                 <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                 <XAxis dataKey="name" tick={{ fontSize: 11 }} angle={-35} textAnchor="end" interval={0} />
                 <YAxis tick={{ fontSize: 11 }} tickFormatter={v => formatCurrency(v)} width={80} />
-                <Tooltip formatter={(v: number) => `EGP ${formatCurrency(v)}`} />
+                <Tooltip formatter={(v) => `EGP ${formatCurrency(Number(v))}`} />
                 <Legend wrapperStyle={{ paddingTop: 12 }} />
                 <Bar dataKey="Grand Total" fill="#8b5cf6" radius={[3, 3, 0, 0]} />
               </BarChart>
