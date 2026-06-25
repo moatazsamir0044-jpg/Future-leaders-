@@ -1,6 +1,3 @@
 {
-  "buildCommand": "cd plpm-app && npm install && npm run build",
-  "installCommand": "echo 'install handled in build'",
-  "framework": "nextjs",
-  "outputDirectory": "plpm-app/.next"
+  "framework": "nextjs"
 }
