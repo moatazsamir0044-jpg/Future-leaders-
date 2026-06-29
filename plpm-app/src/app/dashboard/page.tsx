@@ -13,8 +13,25 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   const supabase = await createClient()
 
   const now = new Date()
-  const month = parseInt(params.month ?? String(now.getMonth() + 1))
-  const year = parseInt(params.year ?? String(now.getFullYear()))
+  let defaultMonth = now.getMonth() + 1
+  let defaultYear = now.getFullYear()
+
+  if (!params.month && !params.year) {
+    const { data: latest } = await supabase
+      .from('payroll_periods')
+      .select('month, year')
+      .order('year', { ascending: false })
+      .order('month', { ascending: false })
+      .limit(1)
+      .single()
+    if (latest) {
+      defaultMonth = latest.month
+      defaultYear = latest.year
+    }
+  }
+
+  const month = parseInt(params.month ?? String(defaultMonth))
+  const year = parseInt(params.year ?? String(defaultYear))
 
   // Fetch all data in parallel
   const [
