@@ -2,7 +2,12 @@ import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 import { SUPABASE_ANON_KEY, SUPABASE_URL } from '@/lib/supabase/config'
 
-export async function middleware(request: NextRequest) {
+// Next.js 16 renamed the `middleware` convention to `proxy`. This runs on
+// every matched request and refreshes the Supabase auth session so that
+// Server Components always receive a valid (non-expired) access token.
+// Without it, an expired JWT reaches PostgREST, RLS treats the request as
+// anonymous, and every query silently returns zero rows.
+export async function proxy(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request })
 
   const supabase = createServerClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
@@ -20,7 +25,8 @@ export async function middleware(request: NextRequest) {
     },
   })
 
-  // Refresh session if expired — required for @supabase/ssr
+  // IMPORTANT: refreshes the session and writes rotated tokens back to the
+  // response cookies. Do not run any code between client creation and this call.
   await supabase.auth.getUser()
 
   return supabaseResponse
@@ -28,6 +34,7 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+    // Run on all paths except static assets and image files.
+    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)',
   ],
 }
