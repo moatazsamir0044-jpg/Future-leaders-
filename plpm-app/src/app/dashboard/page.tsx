@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic'
+
 import { createClient } from '@/lib/supabase/server'
 import { formatCurrency, formatMonthYear } from '@/lib/utils'
 import { StatusBadge } from '@/components/ui/badge'
