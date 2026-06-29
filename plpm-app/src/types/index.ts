@@ -79,6 +79,7 @@ export interface PayrollRecord {
   deductions: number
   insurance: number
   penalties: number
+  holiday_extra_days: number
   total_gross: number
   net_salary: number
   notes: string | null
