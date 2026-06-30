@@ -5,9 +5,11 @@ import { StatusBadge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { DashboardFilters } from '@/components/dashboard/filters'
 import { NewPayrollButton } from '@/components/payroll/new-payroll-button'
-import { FileText, Plus } from 'lucide-react'
+import { ServiceTypeFilter } from '@/components/payroll/service-type-filter'
+import { FileText } from 'lucide-react'
+import { Suspense } from 'react'
 
-interface SearchParams { month?: string; year?: string; site?: string }
+interface SearchParams { month?: string; year?: string; site?: string; type?: string }
 
 export default async function PayrollPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const params = await searchParams
@@ -15,8 +17,9 @@ export default async function PayrollPage({ searchParams }: { searchParams: Prom
   const now = new Date()
   const month = parseInt(params.month ?? String(now.getMonth() + 1))
   const year = parseInt(params.year ?? String(now.getFullYear()))
+  const serviceType = params.type ?? ''
 
-  const [{ data: periods }, { data: sites }] = await Promise.all([
+  const [{ data: allPeriods }, { data: sites }] = await Promise.all([
     supabase.from('payroll_periods')
       .select('*, site:sites(id, name, name_ar, service_type, client_name)')
       .eq('month', month).eq('year', year)
@@ -24,7 +27,17 @@ export default async function PayrollPage({ searchParams }: { searchParams: Prom
     supabase.from('sites').select('*').eq('active', true).order('sort_order'),
   ])
 
-  const totalNet = (periods ?? []).reduce((s, p) => s + Number(p.total_net ?? 0), 0)
+  const periods = serviceType
+    ? (allPeriods ?? []).filter(p => {
+        const site = p.site as { service_type: string } | null
+        return site?.service_type === serviceType
+      })
+    : (allPeriods ?? [])
+
+  const existingSiteIds = new Set((allPeriods ?? []).map(p => p.site_id))
+  const availableSites = (sites ?? []).filter(s => !existingSiteIds.has(s.id))
+
+  const totalNet = periods.reduce((s, p) => s + Number(p.total_net ?? 0), 0)
 
   return (
     <div className="p-6 space-y-6">
@@ -35,7 +48,7 @@ export default async function PayrollPage({ searchParams }: { searchParams: Prom
         </div>
         <div className="flex items-center gap-3">
           <DashboardFilters currentMonth={month} currentYear={year} />
-          <NewPayrollButton sites={sites ?? []} month={month} year={year} />
+          <NewPayrollButton sites={availableSites} month={month} year={year} />
         </div>
       </div>
 
@@ -56,10 +69,15 @@ export default async function PayrollPage({ searchParams }: { searchParams: Prom
       {/* Table */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <FileText className="h-4 w-4 text-blue-600" />
-            Payroll Sheets — {formatMonthYear(month, year)}
-          </CardTitle>
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <CardTitle className="flex items-center gap-2">
+              <FileText className="h-4 w-4 text-blue-600" />
+              Payroll Sheets — {formatMonthYear(month, year)}
+            </CardTitle>
+            <Suspense>
+              <ServiceTypeFilter current={serviceType} />
+            </Suspense>
+          </div>
         </CardHeader>
         <CardContent className="p-0">
           <div className="overflow-x-auto">

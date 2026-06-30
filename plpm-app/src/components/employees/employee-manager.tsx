@@ -122,11 +122,11 @@ export function EmployeeManager({ employees: initial, sites }: { employees: Empl
         <tbody className="divide-y divide-gray-50">
           {filtered.length === 0 ? (
             <tr><td colSpan={8} className="px-4 py-10 text-center text-gray-400">No employees found.</td></tr>
-          ) : filtered.map(e => {
+          ) : filtered.map((e, index) => {
             const site = e.site as { name: string; service_type: string } | undefined
             return (
               <tr key={e.id} className={`hover:bg-gray-50/50 ${!e.active ? 'opacity-50' : ''}`}>
-                <td className="px-4 py-3 text-gray-500 text-xs">{e.worker_number}</td>
+                <td className="px-4 py-3 text-gray-500 text-xs">{index + 1}</td>
                 <td className="px-4 py-3 font-medium text-gray-900" dir="rtl">{e.name}</td>
                 <td className="px-4 py-3 text-gray-600 text-xs">
                   {site?.name}
