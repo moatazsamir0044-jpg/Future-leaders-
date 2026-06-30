@@ -5,9 +5,11 @@ import { StatusBadge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { DashboardFilters } from '@/components/dashboard/filters'
 import { NewExpenseButton } from '@/components/expenses/new-expense-button'
+import { ServiceTypeFilter } from '@/components/payroll/service-type-filter'
 import { Receipt } from 'lucide-react'
+import { Suspense } from 'react'
 
-interface SearchParams { month?: string; year?: string }
+interface SearchParams { month?: string; year?: string; type?: string }
 
 export default async function ExpensesPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const params = await searchParams
@@ -15,8 +17,9 @@ export default async function ExpensesPage({ searchParams }: { searchParams: Pro
   const now = new Date()
   const month = parseInt(params.month ?? String(now.getMonth() + 1))
   const year = parseInt(params.year ?? String(now.getFullYear()))
+  const serviceType = params.type ?? ''
 
-  const [{ data: reports }, { data: sites }] = await Promise.all([
+  const [{ data: allReports }, { data: sites }] = await Promise.all([
     supabase.from('expense_reports')
       .select('*, site:sites(id, name, service_type, client_name)')
       .eq('month', month).eq('year', year)
@@ -24,7 +27,17 @@ export default async function ExpensesPage({ searchParams }: { searchParams: Pro
     supabase.from('sites').select('*').eq('active', true).order('sort_order'),
   ])
 
-  const grandTotal = (reports ?? []).reduce((s, r) => s + Number(r.grand_total ?? 0), 0)
+  const reports = serviceType
+    ? (allReports ?? []).filter(r => {
+        const site = r.site as { service_type: string } | null
+        return site?.service_type === serviceType
+      })
+    : (allReports ?? [])
+
+  const existingSiteIds = new Set((allReports ?? []).map(r => r.site_id))
+  const availableSites = (sites ?? []).filter(s => !existingSiteIds.has(s.id))
+
+  const grandTotal = reports.reduce((s, r) => s + Number(r.grand_total ?? 0), 0)
 
   return (
     <div className="p-6 space-y-6">
@@ -35,7 +48,7 @@ export default async function ExpensesPage({ searchParams }: { searchParams: Pro
         </div>
         <div className="flex items-center gap-3">
           <DashboardFilters currentMonth={month} currentYear={year} />
-          <NewExpenseButton sites={sites ?? []} month={month} year={year} />
+          <NewExpenseButton sites={availableSites} month={month} year={year} />
         </div>
       </div>
 
@@ -54,10 +67,13 @@ export default async function ExpensesPage({ searchParams }: { searchParams: Pro
 
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Receipt className="h-4 w-4 text-purple-600" />
-            Expense Reports — {formatMonthYear(month, year)}
-          </CardTitle>
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <CardTitle className="flex items-center gap-2">
+              <Receipt className="h-4 w-4 text-purple-600" />
+              Expense Reports — {formatMonthYear(month, year)}
+            </CardTitle>
+            <Suspense><ServiceTypeFilter current={serviceType} /></Suspense>
+          </div>
         </CardHeader>
         <CardContent className="p-0">
           <div className="overflow-x-auto">
@@ -76,14 +92,14 @@ export default async function ExpensesPage({ searchParams }: { searchParams: Pro
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
-                {(reports ?? []).length === 0 ? (
+                {reports.length === 0 ? (
                   <tr>
                     <td colSpan={9} className="px-5 py-12 text-center text-gray-400">
                       <Receipt className="h-8 w-8 mx-auto mb-2 opacity-40" />
                       No expense reports yet. Create one to get started.
                     </td>
                   </tr>
-                ) : (reports ?? []).map(r => {
+                ) : reports.map(r => {
                   const site = r.site as { name: string; service_type: string; client_name?: string }
                   return (
                     <tr key={r.id} className="hover:bg-gray-50/50 transition-colors">

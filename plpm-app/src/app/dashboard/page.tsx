@@ -6,9 +6,11 @@ import { StatusBadge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { DashboardCharts } from '@/components/dashboard/charts'
 import { DashboardFilters } from '@/components/dashboard/filters'
-import { FileText, Receipt, CheckSquare, AlertCircle, TrendingUp, Building2 } from 'lucide-react'
+import { FileText, Receipt, CheckSquare, TrendingUp } from 'lucide-react'
+import { ServiceTypeFilter } from '@/components/payroll/service-type-filter'
+import { Suspense } from 'react'
 
-interface SearchParams { month?: string; year?: string; site?: string; status?: string }
+interface SearchParams { month?: string; year?: string; site?: string; status?: string; type?: string }
 
 export default async function DashboardPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const params = await searchParams
@@ -34,16 +36,15 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
 
   const month = parseInt(params.month ?? String(defaultMonth))
   const year = parseInt(params.year ?? String(defaultYear))
+  const serviceType = params.type ?? ''
 
   // Fetch all data in parallel
   const [
-    { data: sites },
-    { data: payrollPeriods },
-    { data: expenseReports },
+    { data: allPayroll },
+    { data: allExpenses },
     { data: pendingPayroll },
     { data: pendingExpenses },
   ] = await Promise.all([
-    supabase.from('sites').select('*').eq('active', true).order('sort_order'),
     supabase.from('payroll_periods')
       .select('*, site:sites(name, service_type)')
       .eq('month', month).eq('year', year)
@@ -56,20 +57,31 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
     supabase.from('expense_reports').select('id').eq('status', 'submitted'),
   ])
 
-  const totalPayroll = (payrollPeriods ?? []).reduce((s, p) => s + Number(p.total_net ?? 0), 0)
-  const totalExpenses = (expenseReports ?? []).reduce((s, e) => s + Number(e.grand_total ?? 0), 0)
-  const approvedPayroll = (payrollPeriods ?? []).filter(p => p.status === 'approved').length
-  const approvedExpenses = (expenseReports ?? []).filter(e => e.status === 'approved').length
+  const payrollPeriods = serviceType
+    ? (allPayroll ?? []).filter(p => (p.site as { service_type: string })?.service_type === serviceType)
+    : (allPayroll ?? [])
+
+  const expenseReports = serviceType
+    ? (allExpenses ?? []).filter(e => (e.site as { service_type: string })?.service_type === serviceType)
+    : (allExpenses ?? [])
+
+  const totalPayroll = payrollPeriods.reduce((s, p) => s + Number(p.total_net ?? 0), 0)
+  const totalExpenses = expenseReports.reduce((s, e) => s + Number(e.grand_total ?? 0), 0)
+  const approvedPayroll = payrollPeriods.filter(p => p.status === 'approved').length
+  const approvedExpenses = expenseReports.filter(e => e.status === 'approved').length
 
   return (
     <div className="p-6 space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
           <p className="text-sm text-gray-500 mt-0.5">{formatMonthYear(month, year)} overview</p>
         </div>
-        <DashboardFilters currentMonth={month} currentYear={year} />
+        <div className="flex items-center gap-3 flex-wrap">
+          <Suspense><ServiceTypeFilter current={serviceType} /></Suspense>
+          <DashboardFilters currentMonth={month} currentYear={year} />
+        </div>
       </div>
 
       {/* KPI cards */}
