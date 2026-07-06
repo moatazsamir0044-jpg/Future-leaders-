@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { createClient } from '@/lib/supabase/client'
+import { updateApprovalStatus, type WorkflowStatus } from '@/lib/approvals'
 import { Button } from '@/components/ui/button'
 import { Modal } from '@/components/ui/modal'
 import { useToast } from '@/components/ui/toast'
@@ -40,50 +40,17 @@ export function ExpenseActions({ report, transportation, accommodation, items, s
   const status = report.status
   const hasData = transportation.length > 0 || accommodation.length > 0 || items.length > 0
 
-  async function updateStatus(newStatus: string, notes?: string) {
+  async function updateStatus(newStatus: WorkflowStatus, notes?: string) {
     setLoading(newStatus)
     setActionError('')
-    const supabase = createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    const now = new Date().toISOString()
-
-    const updates: Record<string, unknown> = { status: newStatus }
-    if (newStatus === 'submitted') {
-      updates.submitted_by = user?.id ?? null
-      updates.submitted_at = now
-    }
-    if (newStatus === 'approved') {
-      updates.approved_by = user?.id ?? null
-      updates.approved_at = now
-      updates.rejection_notes = null
-    }
-    if (newStatus === 'rejected' && notes) updates.rejection_notes = notes
-    if (newStatus === 'draft') {
-      updates.submitted_by = null
-      updates.submitted_at = null
-      updates.approved_by = null
-      updates.approved_at = null
-      updates.rejection_notes = null
-    }
-
-    const { error: err } = await supabase.from('expense_reports').update(updates).eq('id', report.id)
+    const err = await updateApprovalStatus('expense', report.id, newStatus, notes)
     if (err) {
-      setActionError(`Could not update status: ${err.message}`)
+      setActionError(`Could not update status: ${err}`)
       toast('Status update failed', 'error')
       setLoading(null)
       return
     }
     toast(STATUS_TOAST[newStatus] ?? 'Status updated')
-
-    if (user) {
-      await supabase.from('approval_logs').insert({
-        entity_type: 'expense',
-        entity_id: report.id,
-        action: newStatus === 'submitted' ? 'submitted' : newStatus === 'approved' ? 'approved' : newStatus === 'rejected' ? 'rejected' : 'reset_to_draft',
-        performed_by: user.id,
-        notes: notes ?? null,
-      })
-    }
     router.refresh()
     setLoading(null)
   }
