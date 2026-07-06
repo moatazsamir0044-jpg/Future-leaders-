@@ -16,39 +16,53 @@ export default async function ApprovalsPage({ searchParams }: { searchParams: Pr
   const params = await searchParams
   const supabase = await createClient()
   const view = params.view === 'history' ? 'history' : 'pending'
-  const { month, year } = await resolvePeriod(supabase, params)
 
-  const { data: { user } } = await supabase.auth.getUser()
+  const [
+    { data: { user } },
+    { data: pendingPayroll },
+    { data: pendingExpenses },
+  ] = await Promise.all([
+    supabase.auth.getUser(),
+    supabase.from('payroll_periods')
+      .select('*, site:sites(name, service_type, client_name)')
+      .eq('status', 'submitted')
+      .order('year').order('month').order('submitted_at', { ascending: true, nullsFirst: true }),
+    supabase.from('expense_reports')
+      .select('*, site:sites(name, service_type, client_name)')
+      .eq('status', 'submitted')
+      .order('year').order('month').order('submitted_at', { ascending: true, nullsFirst: true }),
+  ])
+
   const { data: profile } = user
     ? await supabase.from('user_profiles').select('role').eq('id', user.id).single()
     : { data: null }
   const isAdmin = profile?.role === 'admin'
 
-  const [
-    { data: pendingPayroll },
-    { data: pendingExpenses },
-    { data: historyPayroll },
-    { data: historyExpenses },
-  ] = await Promise.all([
-    supabase.from('payroll_periods')
-      .select('*, site:sites(name, service_type, client_name)')
-      .eq('status', 'submitted')
-      .order('year').order('month').order('submitted_at', { ascending: true, nullsFirst: true }),
-    supabase.from('expense_reports')
-      .select('*, site:sites(name, service_type, client_name)')
-      .eq('status', 'submitted')
-      .order('year').order('month').order('submitted_at', { ascending: true, nullsFirst: true }),
-    supabase.from('payroll_periods')
-      .select('*, site:sites(name, service_type, client_name)')
-      .eq('month', month).eq('year', year)
-      .in('status', ['submitted', 'approved', 'rejected'])
-      .order('created_at', { ascending: false }),
-    supabase.from('expense_reports')
-      .select('*, site:sites(name, service_type, client_name)')
-      .eq('month', month).eq('year', year)
-      .in('status', ['submitted', 'approved', 'rejected'])
-      .order('created_at', { ascending: false }),
-  ])
+  // The History queries (and the month/year they need) only run for the
+  // History tab — the default Pending view never renders them.
+  let month = 0
+  let year = 0
+  let historyPayroll: ApprovalRow[] = []
+  let historyExpenses: ApprovalRow[] = []
+  if (view === 'history') {
+    const resolved = await resolvePeriod(supabase, params)
+    month = resolved.month
+    year = resolved.year
+    const [{ data: hp }, { data: he }] = await Promise.all([
+      supabase.from('payroll_periods')
+        .select('*, site:sites(name, service_type, client_name)')
+        .eq('month', month).eq('year', year)
+        .in('status', ['submitted', 'approved', 'rejected'])
+        .order('created_at', { ascending: false }),
+      supabase.from('expense_reports')
+        .select('*, site:sites(name, service_type, client_name)')
+        .eq('month', month).eq('year', year)
+        .in('status', ['submitted', 'approved', 'rejected'])
+        .order('created_at', { ascending: false }),
+    ])
+    historyPayroll = hp ?? []
+    historyExpenses = he ?? []
+  }
 
   const nPendingPayroll = (pendingPayroll ?? []).length
   const nPendingExpenses = (pendingExpenses ?? []).length
@@ -72,7 +86,7 @@ export default async function ApprovalsPage({ searchParams }: { searchParams: Pr
               Pending{nPendingPayroll + nPendingExpenses > 0 ? ` (${nPendingPayroll + nPendingExpenses})` : ''}
             </Link>
             <Link
-              href={`/dashboard/approvals?view=history&month=${month}&year=${year}`}
+              href={view === 'history' ? `/dashboard/approvals?view=history&month=${month}&year=${year}` : '/dashboard/approvals?view=history'}
               className={cn('px-3 py-1.5 rounded-md transition-colors', view === 'history' ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-50')}
             >
               History
@@ -123,7 +137,7 @@ export default async function ApprovalsPage({ searchParams }: { searchParams: Pr
         <>
           <HistoryTable
             title="Payroll Sheets"
-            rows={historyPayroll ?? []}
+            rows={historyPayroll}
             hrefBase="/dashboard/payroll"
             amountLabel="Net Total"
             amountKey="total_net"
@@ -132,7 +146,7 @@ export default async function ApprovalsPage({ searchParams }: { searchParams: Pr
           />
           <HistoryTable
             title="Expense Reports"
-            rows={historyExpenses ?? []}
+            rows={historyExpenses}
             hrefBase="/dashboard/expenses"
             amountLabel="Grand Total"
             amountKey="grand_total"

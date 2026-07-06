@@ -65,6 +65,9 @@ export function NewPayrollButton({ sites, month, year }: { sites: Site[]; month:
         return
       }
 
+      // Explicitly zero every numeric column the manual "Add Employee" form
+      // always sends, so this bulk insert doesn't depend on database defaults
+      // existing for columns the rest of the app never omits.
       const rows = employees.map(emp => ({
         period_id: data.id,
         site_id: siteId,
@@ -73,6 +76,24 @@ export function NewPayrollButton({ sites, month, year }: { sites: Site[]; month:
         employee_name: emp.name,
         base_monthly_salary: emp.base_monthly_salary,
         daily_wage: emp.daily_wage,
+        attendance_days: 0,
+        absence_days: 0,
+        net_days: 0,
+        monthly_leave_days: 0,
+        annual_leave_days: 0,
+        absence_no_permission: 0,
+        overtime_hours: 0,
+        less_hours: 0,
+        bonuses: 0,
+        transportation_amount: 0,
+        transportation_category: 0,
+        advance: 0,
+        insurance: 0,
+        deductions: 0,
+        penalties: 0,
+        holiday_extra_days: 0,
+        total_gross: 0,
+        net_salary: 0,
       }))
       const { error: insertErr } = await supabase.from('payroll_records').insert(rows)
       if (insertErr) {

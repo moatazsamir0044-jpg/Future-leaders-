@@ -53,5 +53,8 @@ export async function resolvePeriod(
     year = latest.year
   }
 
-  return { month: paramMonth ?? month, year: paramYear ?? year }
+  // A URL with only one of month/year set is treated as no valid params at
+  // all — mixing an explicit month with an unrelated default year (or vice
+  // versa) would silently show a period nobody asked for.
+  return { month, year }
 }
