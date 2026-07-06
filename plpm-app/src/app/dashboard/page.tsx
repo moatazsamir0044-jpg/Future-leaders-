@@ -1,6 +1,7 @@
 export const dynamic = 'force-dynamic'
 
 import { createClient } from '@/lib/supabase/server'
+import { resolvePeriod } from '@/lib/period'
 import { formatCurrency, formatMonthYear } from '@/lib/utils'
 import { StatusBadge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -14,26 +15,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   const params = await searchParams
   const supabase = await createClient()
 
-  const now = new Date()
-  let defaultMonth = now.getMonth() + 1
-  let defaultYear = now.getFullYear()
-
-  if (!params.month && !params.year) {
-    const { data: latest } = await supabase
-      .from('payroll_periods')
-      .select('month, year')
-      .order('year', { ascending: false })
-      .order('month', { ascending: false })
-      .limit(1)
-      .single()
-    if (latest) {
-      defaultMonth = latest.month
-      defaultYear = latest.year
-    }
-  }
-
-  const month = parseInt(params.month ?? String(defaultMonth))
-  const year = parseInt(params.year ?? String(defaultYear))
+  const { month, year } = await resolvePeriod(supabase, params)
 
   // Fetch all data in parallel
   const [
@@ -99,7 +81,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
           icon={CheckSquare}
           label="Pending Approvals"
           value={String((pendingPayroll?.length ?? 0) + (pendingExpenses?.length ?? 0))}
-          sub={`${pendingPayroll?.length ?? 0} payroll · ${pendingExpenses?.length ?? 0} expenses`}
+          sub={`${pendingPayroll?.length ?? 0} payroll · ${pendingExpenses?.length ?? 0} expenses (all months)`}
           color={(pendingPayroll?.length ?? 0) + (pendingExpenses?.length ?? 0) > 0 ? 'amber' : 'green'}
         />
       </div>

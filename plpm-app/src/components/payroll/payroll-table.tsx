@@ -83,6 +83,7 @@ export function PayrollTable({ periodId, records: initialRecords, periodStatus, 
   const [form, setForm] = useState<FormData>(emptyForm())
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const [tableError, setTableError] = useState('')
   const [, startTransition] = useTransition()
   const router = useRouter()
   const canEdit = periodStatus === 'draft' || periodStatus === 'rejected'
@@ -130,9 +131,11 @@ export function PayrollTable({ periodId, records: initialRecords, periodStatus, 
       ? records.map(r => r.id === editRecord.id ? result.data : r)
       : [...records, result.data]
     setRecords(updated)
+    setTableError('')
     const totalGross = updated.reduce((s: number, r: PayrollRecord) => s + Number(r.total_gross), 0)
     const totalNet = updated.reduce((s: number, r: PayrollRecord) => s + Number(r.net_salary), 0)
-    await supabase.from('payroll_periods').update({ total_gross: totalGross, total_net: totalNet }).eq('id', periodId)
+    const { error: totalsErr } = await supabase.from('payroll_periods').update({ total_gross: totalGross, total_net: totalNet }).eq('id', periodId)
+    if (totalsErr) setTableError(`Record saved, but sheet totals could not be updated: ${totalsErr.message}`)
 
     setSaving(false)
     setModalOpen(false)
@@ -141,13 +144,19 @@ export function PayrollTable({ periodId, records: initialRecords, periodStatus, 
 
   async function handleDelete(r: PayrollRecord) {
     if (!confirm(`Delete record for ${r.employee_name}?`)) return
+    setTableError('')
     const supabase = createClient()
-    await supabase.from('payroll_records').delete().eq('id', r.id)
+    const { error: deleteErr } = await supabase.from('payroll_records').delete().eq('id', r.id)
+    if (deleteErr) {
+      setTableError(`Could not delete ${r.employee_name}: ${deleteErr.message}`)
+      return
+    }
     const updated = records.filter(rec => rec.id !== r.id)
     setRecords(updated)
     const totalGross = updated.reduce((s: number, rec: PayrollRecord) => s + Number(rec.total_gross), 0)
     const totalNet = updated.reduce((s: number, rec: PayrollRecord) => s + Number(rec.net_salary), 0)
-    await supabase.from('payroll_periods').update({ total_gross: totalGross, total_net: totalNet }).eq('id', periodId)
+    const { error: totalsErr } = await supabase.from('payroll_periods').update({ total_gross: totalGross, total_net: totalNet }).eq('id', periodId)
+    if (totalsErr) setTableError(`Record deleted, but sheet totals could not be updated: ${totalsErr.message}`)
     startTransition(() => router.refresh())
   }
 
@@ -162,6 +171,10 @@ export function PayrollTable({ periodId, records: initialRecords, periodStatus, 
             <Plus className="h-3.5 w-3.5" /> Add Employee
           </Button>
         </div>
+      )}
+
+      {tableError && (
+        <div className="mx-4 my-3 bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-sm text-red-700">{tableError}</div>
       )}
 
       <div className="overflow-x-auto">
@@ -185,7 +198,7 @@ export function PayrollTable({ periodId, records: initialRecords, periodStatus, 
           </thead>
           <tbody className="divide-y divide-gray-50">
             {records.length === 0 ? (
-              <tr><td colSpan={13} className="px-4 py-10 text-center text-gray-400">No employees yet. Click "Add Employee" to start.</td></tr>
+              <tr><td colSpan={13} className="px-4 py-10 text-center text-gray-400">No employees yet. Click &quot;Add Employee&quot; to start.</td></tr>
             ) : records.map((r, i) => (
               <tr key={r.id} className="hover:bg-gray-50/50">
                 <td className="px-4 py-3 text-gray-500 text-xs">{r.worker_number ?? i + 1}</td>

@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
+import { resolvePeriod } from '@/lib/period'
 import { formatCurrency, formatMonthYear } from '@/lib/utils'
 import { StatusBadge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -12,9 +13,7 @@ interface SearchParams { month?: string; year?: string }
 export default async function ExpensesPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const params = await searchParams
   const supabase = await createClient()
-  const now = new Date()
-  const month = parseInt(params.month ?? String(now.getMonth() + 1))
-  const year = parseInt(params.year ?? String(now.getFullYear()))
+  const { month, year } = await resolvePeriod(supabase, params)
 
   const [{ data: reports }, { data: sites }] = await Promise.all([
     supabase.from('expense_reports')

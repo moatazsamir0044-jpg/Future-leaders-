@@ -23,35 +23,58 @@ export function PayrollActions({ period, records, site, role }: Props) {
   const [rejectOpen, setRejectOpen] = useState(false)
   const [rejectionNotes, setRejectionNotes] = useState('')
   const [error, setError] = useState('')
+  const [actionError, setActionError] = useState('')
 
   const isAdmin = role === 'admin'
   const status = period.status
 
   async function updateStatus(newStatus: string, notes?: string) {
     setLoading(newStatus)
+    setActionError('')
     const supabase = createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    const now = new Date().toISOString()
+
     const updates: Record<string, unknown> = { status: newStatus }
+    if (newStatus === 'submitted') {
+      updates.submitted_by = user?.id ?? null
+      updates.submitted_at = now
+    }
+    if (newStatus === 'approved') {
+      updates.approved_by = user?.id ?? null
+      updates.approved_at = now
+      updates.rejection_notes = null
+    }
     if (newStatus === 'rejected' && notes) updates.rejection_notes = notes
-    if (newStatus === 'approved') updates.rejection_notes = null
+    if (newStatus === 'draft') {
+      updates.submitted_by = null
+      updates.submitted_at = null
+      updates.approved_by = null
+      updates.approved_at = null
+      updates.rejection_notes = null
+    }
 
     const { error: err } = await supabase
       .from('payroll_periods')
       .update(updates)
       .eq('id', period.id)
 
-    if (!err) {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (user) {
-        await supabase.from('approval_logs').insert({
-          entity_type: 'payroll',
-          entity_id: period.id,
-          action: newStatus === 'submitted' ? 'submitted' : newStatus === 'approved' ? 'approved' : newStatus === 'rejected' ? 'rejected' : 'reset',
-          performed_by: user.id,
-          notes: notes ?? null,
-        })
-      }
-      router.refresh()
+    if (err) {
+      setActionError(`Could not update status: ${err.message}`)
+      setLoading(null)
+      return
     }
+
+    if (user) {
+      await supabase.from('approval_logs').insert({
+        entity_type: 'payroll',
+        entity_id: period.id,
+        action: newStatus === 'submitted' ? 'submitted' : newStatus === 'approved' ? 'approved' : newStatus === 'rejected' ? 'rejected' : 'reset_to_draft',
+        performed_by: user.id,
+        notes: notes ?? null,
+      })
+    }
+    router.refresh()
     setLoading(null)
   }
 
@@ -73,6 +96,9 @@ export function PayrollActions({ period, records, site, role }: Props) {
 
   return (
     <div className="flex items-center gap-2 flex-wrap">
+      {actionError && (
+        <p className="w-full text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{actionError}</p>
+      )}
       {/* Export buttons — always visible */}
       <Button variant="outline" size="sm" onClick={handleExcelExport} disabled={records.length === 0}>
         <FileSpreadsheet className="h-3.5 w-3.5" /> Excel

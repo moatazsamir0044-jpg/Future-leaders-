@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
+import { resolvePeriod } from '@/lib/period'
 import { formatCurrency, formatMonthYear } from '@/lib/utils'
 import { StatusBadge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -11,11 +12,9 @@ interface SearchParams { month?: string; year?: string }
 export default async function ApprovalsPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const params = await searchParams
   const supabase = await createClient()
-  const now = new Date()
-  const month = parseInt(params.month ?? String(now.getMonth() + 1))
-  const year = parseInt(params.year ?? String(now.getFullYear()))
+  const { month, year } = await resolvePeriod(supabase, params)
 
-  const [{ data: payroll }, { data: expenses }] = await Promise.all([
+  const [{ data: payroll }, { data: expenses }, { data: allPendingPayroll }, { data: allPendingExpenses }] = await Promise.all([
     supabase.from('payroll_periods')
       .select('*, site:sites(id, name, service_type, client_name)')
       .eq('month', month).eq('year', year)
@@ -26,10 +25,12 @@ export default async function ApprovalsPage({ searchParams }: { searchParams: Pr
       .eq('month', month).eq('year', year)
       .in('status', ['submitted', 'approved', 'rejected'])
       .order('created_at', { ascending: false }),
+    supabase.from('payroll_periods').select('id').eq('status', 'submitted'),
+    supabase.from('expense_reports').select('id').eq('status', 'submitted'),
   ])
 
-  const pendingPayroll = (payroll ?? []).filter(p => p.status === 'submitted').length
-  const pendingExpenses = (expenses ?? []).filter(r => r.status === 'submitted').length
+  const pendingPayroll = (allPendingPayroll ?? []).length
+  const pendingExpenses = (allPendingExpenses ?? []).length
 
   return (
     <div className="p-6 space-y-6">
@@ -43,9 +44,9 @@ export default async function ApprovalsPage({ searchParams }: { searchParams: Pr
 
       <div className="grid grid-cols-3 gap-4">
         {[
-          { label: 'Pending Payroll', value: String(pendingPayroll), color: 'text-amber-600' },
-          { label: 'Pending Expenses', value: String(pendingExpenses), color: 'text-amber-600' },
-          { label: 'Total Pending', value: String(pendingPayroll + pendingExpenses), color: 'text-red-600' },
+          { label: 'Pending Payroll (All Months)', value: String(pendingPayroll), color: 'text-amber-600' },
+          { label: 'Pending Expenses (All Months)', value: String(pendingExpenses), color: 'text-amber-600' },
+          { label: 'Total Pending (All Months)', value: String(pendingPayroll + pendingExpenses), color: 'text-red-600' },
         ].map(({ label, value, color }) => (
           <Card key={label} className="p-4">
             <p className="text-xs text-gray-500 uppercase tracking-wide">{label}</p>
