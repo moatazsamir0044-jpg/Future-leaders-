@@ -10,9 +10,9 @@ export default async function DashboardLayout({ children }: { children: React.Re
 
   return (
     <ToastProvider>
-      <div className="flex min-h-screen">
+      <div className="min-h-screen lg:flex">
         <Sidebar />
-        <main className="flex-1 ml-60 min-h-screen overflow-auto">
+        <main className="flex-1 lg:ml-60 min-h-screen overflow-auto">
           {children}
         </main>
       </div>

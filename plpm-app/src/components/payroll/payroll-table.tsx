@@ -293,7 +293,7 @@ export function PayrollTable({ periodId, records: initialRecords, periodStatus, 
                 {canEdit && (
                   <td className="px-3 py-3">
                     <div className="flex gap-1 justify-end">
-                      <button onClick={() => openEdit(r)} className="text-gray-400 hover:text-blue-600 p-1 rounded transition-colors">
+                      <button onClick={() => openEdit(r)} aria-label={`Edit ${r.employee_name}`} className="text-gray-400 hover:text-blue-600 p-1 rounded transition-colors">
                         <Pencil className="h-3.5 w-3.5" />
                       </button>
                       <button onClick={() => setDeleteTarget(r)} aria-label={`Delete ${r.employee_name}`} className="text-gray-400 hover:text-red-600 p-1 rounded transition-colors">
@@ -371,7 +371,7 @@ export function PayrollTable({ periodId, records: initialRecords, periodStatus, 
           {SECTIONS.map(section => (
             <section key={section.group}>
               <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">{section.title}</h3>
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                 {FIELDS.filter(f => f.group === section.group).map(f => (
                   <div key={f.key}>
                     <label className="block text-xs font-medium text-gray-600 mb-1">{f.label}</label>

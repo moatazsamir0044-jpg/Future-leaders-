@@ -118,7 +118,8 @@ export function EmployeeManager({ employees: initial, sites }: { employees: Empl
         <Button size="sm" onClick={openNew}><Plus className="h-3.5 w-3.5" /> Add Employee</Button>
       </div>
 
-      <table className="w-full text-sm">
+      <div className="overflow-x-auto">
+      <table className="w-full text-sm min-w-[720px]">
         <thead>
           <tr className="bg-gray-50/70 border-b border-gray-100">
             <th className="text-left px-4 py-3 font-medium text-gray-600 w-10">#</th>
@@ -164,10 +165,10 @@ export function EmployeeManager({ employees: initial, sites }: { employees: Empl
                 </td>
                 <td className="px-3 py-3">
                   <div className="flex gap-1 justify-end">
-                    <button onClick={() => openEdit(e)} className="text-gray-400 hover:text-blue-600 p-1 rounded" title="Edit">
+                    <button onClick={() => openEdit(e)} className="text-gray-400 hover:text-blue-600 p-1 rounded" title="Edit" aria-label={`Edit ${e.name}`}>
                       <Pencil className="h-3.5 w-3.5" />
                     </button>
-                    <button onClick={() => handleToggleActive(e)} className="text-gray-400 hover:text-amber-600 p-1 rounded" title={e.active ? 'Deactivate' : 'Activate'}>
+                    <button onClick={() => handleToggleActive(e)} className="text-gray-400 hover:text-amber-600 p-1 rounded" title={e.active ? 'Deactivate' : 'Activate'} aria-label={e.active ? `Deactivate ${e.name}` : `Activate ${e.name}`}>
                       {e.active ? <UserX className="h-3.5 w-3.5" /> : <UserCheck className="h-3.5 w-3.5" />}
                     </button>
                     <button onClick={() => setDeleteTarget(e)} className="text-gray-400 hover:text-red-600 p-1 rounded" title="Delete" aria-label={`Delete ${e.name}`}>
@@ -180,6 +181,7 @@ export function EmployeeManager({ employees: initial, sites }: { employees: Empl
           })}
         </tbody>
       </table>
+      </div>
 
       <ConfirmDialog
         open={deleteTarget !== null}

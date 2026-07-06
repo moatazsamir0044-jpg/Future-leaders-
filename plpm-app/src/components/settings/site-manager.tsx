@@ -70,7 +70,8 @@ export function SiteManager({ sites: initial }: { sites: Site[] }) {
       <div className="px-4 py-3 border-b border-gray-100 flex justify-end">
         <Button size="sm" onClick={openNew}><Plus className="h-3.5 w-3.5" /> Add Site</Button>
       </div>
-      <table className="w-full text-sm">
+      <div className="overflow-x-auto">
+      <table className="w-full text-sm min-w-[640px]">
         <thead>
           <tr className="bg-gray-50/70 border-b border-gray-100">
             <th className="text-left px-4 py-2.5 font-medium text-gray-600">Name</th>
@@ -93,12 +94,12 @@ export function SiteManager({ sites: initial }: { sites: Site[] }) {
               <td className="px-4 py-2.5 text-gray-600">{s.client_name ?? '—'}</td>
               <td className="px-4 py-2.5 text-center text-gray-500 text-xs">{s.sort_order}</td>
               <td className="px-4 py-2.5 text-center">
-                <button onClick={() => handleToggle(s)} className={`${s.active ? 'text-green-600' : 'text-gray-400'} hover:opacity-70`}>
+                <button onClick={() => handleToggle(s)} aria-label={s.active ? `Deactivate ${s.name}` : `Activate ${s.name}`} className={`${s.active ? 'text-green-600' : 'text-gray-400'} hover:opacity-70`}>
                   {s.active ? <ToggleRight className="h-5 w-5" /> : <ToggleLeft className="h-5 w-5" />}
                 </button>
               </td>
               <td className="px-3 py-2.5">
-                <button onClick={() => openEdit(s)} className="text-gray-400 hover:text-blue-600 p-1 rounded">
+                <button onClick={() => openEdit(s)} aria-label={`Edit ${s.name}`} className="text-gray-400 hover:text-blue-600 p-1 rounded">
                   <Pencil className="h-3.5 w-3.5" />
                 </button>
               </td>
@@ -106,6 +107,7 @@ export function SiteManager({ sites: initial }: { sites: Site[] }) {
           ))}
         </tbody>
       </table>
+      </div>
 
       <Modal open={open} onClose={() => setOpen(false)} title={editing ? 'Edit Site' : 'Add Site'} size="md">
         <div className="space-y-4">

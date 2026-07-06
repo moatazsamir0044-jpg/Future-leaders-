@@ -83,7 +83,7 @@ export default async function ApprovalsPage({ searchParams }: { searchParams: Pr
       </div>
 
       {/* Counters — always all-months pending, matching the dashboard KPI */}
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         {[
           { label: 'Pending Payroll', value: String(nPendingPayroll), color: 'text-amber-600' },
           { label: 'Pending Expenses', value: String(nPendingExpenses), color: 'text-amber-600' },

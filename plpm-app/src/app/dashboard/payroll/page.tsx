@@ -39,7 +39,7 @@ export default async function PayrollPage({ searchParams }: { searchParams: Prom
       </div>
 
       {/* Summary */}
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         {[
           { label: 'Payroll Sheets', value: String(periods?.length ?? 0), color: 'text-blue-600' },
           { label: 'Total Net', value: `EGP ${formatCurrency(totalNet)}`, color: 'text-gray-900' },

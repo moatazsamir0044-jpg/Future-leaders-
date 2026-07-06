@@ -38,7 +38,7 @@ export default async function ExpensesPage({ searchParams }: { searchParams: Pro
         </div>
       </div>
 
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         {[
           { label: 'Expense Reports', value: String(reports?.length ?? 0), color: 'text-purple-600' },
           { label: 'Grand Total', value: `EGP ${formatCurrency(grandTotal)}`, color: 'text-gray-900' },
