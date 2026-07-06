@@ -30,19 +30,22 @@ function TransportationTable({
   const [editing, setEditing] = useState<ExpenseTransportation | null>(null)
   const [form, setForm] = useState({ vehicle_name: '', daily_cost: '0', days_count: '0' })
   const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
   const [, startTransition] = useTransition()
   const router = useRouter()
 
-  function openNew() { setEditing(null); setForm({ vehicle_name: '', daily_cost: '0', days_count: '0' }); setOpen(true) }
+  function openNew() { setEditing(null); setForm({ vehicle_name: '', daily_cost: '0', days_count: '0' }); setError(''); setOpen(true) }
   function openEdit(r: ExpenseTransportation) {
     setEditing(r)
     setForm({ vehicle_name: r.vehicle_name, daily_cost: String(r.daily_cost), days_count: String(r.days_count) })
+    setError('')
     setOpen(true)
   }
 
   async function handleSave() {
-    if (!form.vehicle_name.trim()) return
+    if (!form.vehicle_name.trim()) { setError('Vehicle / description is required'); return }
     setSaving(true)
+    setError('')
     const supabase = createClient()
     const daily = parseFloat(form.daily_cost) || 0
     const days = parseFloat(form.days_count) || 0
@@ -59,23 +62,26 @@ function TransportationTable({
     } else {
       result = await supabase.from('expense_transportation').insert(payload).select().single()
     }
-    if (!result.error) {
-      const updated = editing ? rows.map(r => r.id === editing.id ? result.data : r) : [...rows, result.data]
-      setRows(updated)
-      await recalcTotals(supabase, reportId, updated)
-      setOpen(false)
-      startTransition(() => router.refresh())
-    }
+    if (result.error) { setError(result.error.message); setSaving(false); return }
+    const updated = editing ? rows.map(r => r.id === editing.id ? result.data : r) : [...rows, result.data]
+    setRows(updated)
+    const recalcErr = await recalcTotals(supabase, reportId, { total_transportation: updated.reduce((s, r) => s + Number(r.total), 0) })
+    if (recalcErr) setError(`Saved, but report totals could not be updated: ${recalcErr}`)
+    setOpen(false)
+    startTransition(() => router.refresh())
     setSaving(false)
   }
 
   async function handleDelete(r: ExpenseTransportation) {
     if (!confirm(`Delete "${r.vehicle_name}"?`)) return
+    setError('')
     const supabase = createClient()
-    await supabase.from('expense_transportation').delete().eq('id', r.id)
+    const { error: deleteErr } = await supabase.from('expense_transportation').delete().eq('id', r.id)
+    if (deleteErr) { setError(`Could not delete "${r.vehicle_name}": ${deleteErr.message}`); return }
     const updated = rows.filter(x => x.id !== r.id)
     setRows(updated)
-    await recalcTotals(supabase, reportId, updated)
+    const recalcErr = await recalcTotals(supabase, reportId, { total_transportation: updated.reduce((s, x) => s + Number(x.total), 0) })
+    if (recalcErr) setError(`Deleted, but report totals could not be updated: ${recalcErr}`)
     startTransition(() => router.refresh())
   }
 
@@ -93,6 +99,9 @@ function TransportationTable({
           <div className="px-4 py-2 border-b border-gray-100 flex justify-end">
             <Button size="sm" onClick={openNew}><Plus className="h-3.5 w-3.5" /> Add Vehicle</Button>
           </div>
+        )}
+        {error && !open && (
+          <div className="mx-4 my-3 bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-sm text-red-700">{error}</div>
         )}
         <table className="w-full text-sm">
           <thead>
@@ -158,6 +167,7 @@ function TransportationTable({
           <p className="text-xs text-gray-500">
             Total: EGP {formatCurrency((parseFloat(form.daily_cost) || 0) * (parseFloat(form.days_count) || 0))}
           </p>
+          {error && <p className="text-sm text-red-600">{error}</p>}
           <div className="flex justify-end gap-2 pt-2 border-t border-gray-100">
             <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
             <Button onClick={handleSave} loading={saving}>{editing ? 'Save' : 'Add'}</Button>
@@ -178,19 +188,22 @@ function AccommodationTable({
   const [editing, setEditing] = useState<ExpenseAccommodation | null>(null)
   const [form, setForm] = useState({ apartment_name: '', rent_amount: '0' })
   const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
   const [, startTransition] = useTransition()
   const router = useRouter()
 
-  function openNew() { setEditing(null); setForm({ apartment_name: '', rent_amount: '0' }); setOpen(true) }
+  function openNew() { setEditing(null); setForm({ apartment_name: '', rent_amount: '0' }); setError(''); setOpen(true) }
   function openEdit(r: ExpenseAccommodation) {
     setEditing(r)
     setForm({ apartment_name: r.apartment_name, rent_amount: String(r.rent_amount) })
+    setError('')
     setOpen(true)
   }
 
   async function handleSave() {
-    if (!form.apartment_name.trim()) return
+    if (!form.apartment_name.trim()) { setError('Apartment / location is required'); return }
     setSaving(true)
+    setError('')
     const supabase = createClient()
     const payload = {
       report_id: reportId,
@@ -204,23 +217,26 @@ function AccommodationTable({
     } else {
       result = await supabase.from('expense_accommodation').insert(payload).select().single()
     }
-    if (!result.error) {
-      const updated = editing ? rows.map(r => r.id === editing.id ? result.data : r) : [...rows, result.data]
-      setRows(updated)
-      await recalcTotals(supabase, reportId, undefined, updated)
-      setOpen(false)
-      startTransition(() => router.refresh())
-    }
+    if (result.error) { setError(result.error.message); setSaving(false); return }
+    const updated = editing ? rows.map(r => r.id === editing.id ? result.data : r) : [...rows, result.data]
+    setRows(updated)
+    const recalcErr = await recalcTotals(supabase, reportId, { total_accommodation: updated.reduce((s, r) => s + Number(r.rent_amount), 0) })
+    if (recalcErr) setError(`Saved, but report totals could not be updated: ${recalcErr}`)
+    setOpen(false)
+    startTransition(() => router.refresh())
     setSaving(false)
   }
 
   async function handleDelete(r: ExpenseAccommodation) {
     if (!confirm(`Delete "${r.apartment_name}"?`)) return
+    setError('')
     const supabase = createClient()
-    await supabase.from('expense_accommodation').delete().eq('id', r.id)
+    const { error: deleteErr } = await supabase.from('expense_accommodation').delete().eq('id', r.id)
+    if (deleteErr) { setError(`Could not delete "${r.apartment_name}": ${deleteErr.message}`); return }
     const updated = rows.filter(x => x.id !== r.id)
     setRows(updated)
-    await recalcTotals(supabase, reportId, undefined, updated)
+    const recalcErr = await recalcTotals(supabase, reportId, { total_accommodation: updated.reduce((s, x) => s + Number(x.rent_amount), 0) })
+    if (recalcErr) setError(`Deleted, but report totals could not be updated: ${recalcErr}`)
     startTransition(() => router.refresh())
   }
 
@@ -238,6 +254,9 @@ function AccommodationTable({
           <div className="px-4 py-2 border-b border-gray-100 flex justify-end">
             <Button size="sm" onClick={openNew}><Plus className="h-3.5 w-3.5" /> Add Apartment</Button>
           </div>
+        )}
+        {error && !open && (
+          <div className="mx-4 my-3 bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-sm text-red-700">{error}</div>
         )}
         <table className="w-full text-sm">
           <thead>
@@ -289,6 +308,7 @@ function AccommodationTable({
             <input type="number" step="0.01" value={form.rent_amount} onChange={e => setForm(f => ({ ...f, rent_amount: e.target.value }))}
               className="w-full h-8 border border-gray-300 rounded-lg px-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
           </div>
+          {error && <p className="text-sm text-red-600">{error}</p>}
           <div className="flex justify-end gap-2 pt-2 border-t border-gray-100">
             <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
             <Button onClick={handleSave} loading={saving}>{editing ? 'Save' : 'Add'}</Button>
@@ -309,19 +329,22 @@ function ItemsTable({
   const [editing, setEditing] = useState<ExpenseItem | null>(null)
   const [form, setForm] = useState({ category: 'other', description: '', amount: '0' })
   const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
   const [, startTransition] = useTransition()
   const router = useRouter()
 
-  function openNew() { setEditing(null); setForm({ category: 'other', description: '', amount: '0' }); setOpen(true) }
+  function openNew() { setEditing(null); setForm({ category: 'other', description: '', amount: '0' }); setError(''); setOpen(true) }
   function openEdit(r: ExpenseItem) {
     setEditing(r)
     setForm({ category: r.category, description: r.description, amount: String(r.amount) })
+    setError('')
     setOpen(true)
   }
 
   async function handleSave() {
-    if (!form.description.trim()) return
+    if (!form.description.trim()) { setError('Description is required'); return }
     setSaving(true)
+    setError('')
     const supabase = createClient()
     const payload = {
       report_id: reportId,
@@ -336,23 +359,26 @@ function ItemsTable({
     } else {
       result = await supabase.from('expense_items').insert(payload).select().single()
     }
-    if (!result.error) {
-      const updated = editing ? rows.map(r => r.id === editing.id ? result.data : r) : [...rows, result.data]
-      setRows(updated)
-      await recalcTotals(supabase, reportId, undefined, undefined, updated)
-      setOpen(false)
-      startTransition(() => router.refresh())
-    }
+    if (result.error) { setError(result.error.message); setSaving(false); return }
+    const updated = editing ? rows.map(r => r.id === editing.id ? result.data : r) : [...rows, result.data]
+    setRows(updated)
+    const recalcErr = await recalcTotals(supabase, reportId, { total_other: updated.reduce((s, r) => s + Number(r.amount), 0) })
+    if (recalcErr) setError(`Saved, but report totals could not be updated: ${recalcErr}`)
+    setOpen(false)
+    startTransition(() => router.refresh())
     setSaving(false)
   }
 
   async function handleDelete(r: ExpenseItem) {
     if (!confirm(`Delete "${r.description}"?`)) return
+    setError('')
     const supabase = createClient()
-    await supabase.from('expense_items').delete().eq('id', r.id)
+    const { error: deleteErr } = await supabase.from('expense_items').delete().eq('id', r.id)
+    if (deleteErr) { setError(`Could not delete "${r.description}": ${deleteErr.message}`); return }
     const updated = rows.filter(x => x.id !== r.id)
     setRows(updated)
-    await recalcTotals(supabase, reportId, undefined, undefined, updated)
+    const recalcErr = await recalcTotals(supabase, reportId, { total_other: updated.reduce((s, x) => s + Number(x.amount), 0) })
+    if (recalcErr) setError(`Deleted, but report totals could not be updated: ${recalcErr}`)
     startTransition(() => router.refresh())
   }
 
@@ -370,6 +396,9 @@ function ItemsTable({
           <div className="px-4 py-2 border-b border-gray-100 flex justify-end">
             <Button size="sm" onClick={openNew}><Plus className="h-3.5 w-3.5" /> Add Item</Button>
           </div>
+        )}
+        {error && !open && (
+          <div className="mx-4 my-3 bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-sm text-red-700">{error}</div>
         )}
         <table className="w-full text-sm">
           <thead>
@@ -432,6 +461,7 @@ function ItemsTable({
             <input type="number" step="0.01" value={form.amount} onChange={e => setForm(f => ({ ...f, amount: e.target.value }))}
               className="w-full h-8 border border-gray-300 rounded-lg px-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
           </div>
+          {error && <p className="text-sm text-red-600">{error}</p>}
           <div className="flex justify-end gap-2 pt-2 border-t border-gray-100">
             <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
             <Button onClick={handleSave} loading={saving}>{editing ? 'Save' : 'Add'}</Button>
@@ -444,23 +474,33 @@ function ItemsTable({
 
 /* ─── Shared recalc helper ───────────────────────────────────────────────── */
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+// Updates only the section total that changed; the other sections' totals are
+// read from the report so they are never overwritten with stale/empty values.
 async function recalcTotals(
   supabase: ReturnType<typeof createClient>,
   reportId: string,
-  transport?: ExpenseTransportation[],
-  accomm?: ExpenseAccommodation[],
-  items?: ExpenseItem[],
-) {
-  const totalTransportation = (transport ?? []).reduce((s, r) => s + Number(r.total), 0)
-  const totalAccommodation = (accomm ?? []).reduce((s, r) => s + Number(r.rent_amount), 0)
-  const totalOther = (items ?? []).reduce((s, r) => s + Number(r.amount), 0)
-  const grandTotal = totalTransportation + totalAccommodation + totalOther
-
-  await supabase
+  patch: Partial<{ total_transportation: number; total_accommodation: number; total_other: number }>,
+): Promise<string | null> {
+  const { data: report, error: fetchErr } = await supabase
     .from('expense_reports')
-    .update({ total_transportation: totalTransportation, total_accommodation: totalAccommodation, total_other: totalOther, grand_total: grandTotal })
+    .select('total_transportation, total_accommodation, total_other')
     .eq('id', reportId)
+    .single()
+  if (fetchErr) return fetchErr.message
+
+  const totals = {
+    total_transportation: patch.total_transportation ?? Number(report.total_transportation ?? 0),
+    total_accommodation: patch.total_accommodation ?? Number(report.total_accommodation ?? 0),
+    total_other: patch.total_other ?? Number(report.total_other ?? 0),
+  }
+  const { error } = await supabase
+    .from('expense_reports')
+    .update({
+      ...totals,
+      grand_total: totals.total_transportation + totals.total_accommodation + totals.total_other,
+    })
+    .eq('id', reportId)
+  return error ? error.message : null
 }
 
 /* ─── Main export ────────────────────────────────────────────────────────── */

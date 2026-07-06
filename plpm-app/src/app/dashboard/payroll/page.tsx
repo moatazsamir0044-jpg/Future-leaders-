@@ -1,20 +1,19 @@
 import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
+import { resolvePeriod } from '@/lib/period'
 import { formatCurrency, formatMonthYear } from '@/lib/utils'
 import { StatusBadge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { DashboardFilters } from '@/components/dashboard/filters'
 import { NewPayrollButton } from '@/components/payroll/new-payroll-button'
-import { FileText, Plus } from 'lucide-react'
+import { FileText } from 'lucide-react'
 
 interface SearchParams { month?: string; year?: string; site?: string }
 
 export default async function PayrollPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const params = await searchParams
   const supabase = await createClient()
-  const now = new Date()
-  const month = parseInt(params.month ?? String(now.getMonth() + 1))
-  const year = parseInt(params.year ?? String(now.getFullYear()))
+  const { month, year } = await resolvePeriod(supabase, params)
 
   const [{ data: periods }, { data: sites }] = await Promise.all([
     supabase.from('payroll_periods')
