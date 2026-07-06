@@ -2,9 +2,10 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { createClient } from '@/lib/supabase/client'
+import { updateApprovalStatus, type WorkflowStatus } from '@/lib/approvals'
 import { Button } from '@/components/ui/button'
 import { Modal } from '@/components/ui/modal'
+import { useToast } from '@/components/ui/toast'
 import { exportPayrollToExcel } from '@/lib/export/excel'
 import { exportPayrollToPDF } from '@/lib/export/pdf'
 import { FileSpreadsheet, FileText, Send, CheckCircle, XCircle, RotateCcw } from 'lucide-react'
@@ -17,8 +18,16 @@ interface Props {
   role: string
 }
 
+const STATUS_TOAST: Record<string, string> = {
+  submitted: 'Payroll submitted for approval',
+  approved: 'Payroll approved',
+  rejected: 'Payroll rejected',
+  draft: 'Payroll reset to draft — it can be edited again',
+}
+
 export function PayrollActions({ period, records, site, role }: Props) {
   const router = useRouter()
+  const toast = useToast()
   const [loading, setLoading] = useState<string | null>(null)
   const [rejectOpen, setRejectOpen] = useState(false)
   const [rejectionNotes, setRejectionNotes] = useState('')
@@ -28,52 +37,17 @@ export function PayrollActions({ period, records, site, role }: Props) {
   const isAdmin = role === 'admin'
   const status = period.status
 
-  async function updateStatus(newStatus: string, notes?: string) {
+  async function updateStatus(newStatus: WorkflowStatus, notes?: string) {
     setLoading(newStatus)
     setActionError('')
-    const supabase = createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    const now = new Date().toISOString()
-
-    const updates: Record<string, unknown> = { status: newStatus }
-    if (newStatus === 'submitted') {
-      updates.submitted_by = user?.id ?? null
-      updates.submitted_at = now
-    }
-    if (newStatus === 'approved') {
-      updates.approved_by = user?.id ?? null
-      updates.approved_at = now
-      updates.rejection_notes = null
-    }
-    if (newStatus === 'rejected' && notes) updates.rejection_notes = notes
-    if (newStatus === 'draft') {
-      updates.submitted_by = null
-      updates.submitted_at = null
-      updates.approved_by = null
-      updates.approved_at = null
-      updates.rejection_notes = null
-    }
-
-    const { error: err } = await supabase
-      .from('payroll_periods')
-      .update(updates)
-      .eq('id', period.id)
-
+    const err = await updateApprovalStatus('payroll', period.id, newStatus, notes)
     if (err) {
-      setActionError(`Could not update status: ${err.message}`)
+      setActionError(`Could not update status: ${err}`)
+      toast('Status update failed', 'error')
       setLoading(null)
       return
     }
-
-    if (user) {
-      await supabase.from('approval_logs').insert({
-        entity_type: 'payroll',
-        entity_id: period.id,
-        action: newStatus === 'submitted' ? 'submitted' : newStatus === 'approved' ? 'approved' : newStatus === 'rejected' ? 'rejected' : 'reset_to_draft',
-        performed_by: user.id,
-        notes: notes ?? null,
-      })
-    }
+    toast(STATUS_TOAST[newStatus] ?? 'Status updated')
     router.refresh()
     setLoading(null)
   }

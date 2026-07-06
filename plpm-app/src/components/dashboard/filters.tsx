@@ -22,6 +22,7 @@ export function DashboardFilters({ currentMonth, currentYear }: { currentMonth: 
       <select
         value={currentMonth}
         onChange={e => update('month', e.target.value)}
+        aria-label="Month"
         className="h-9 rounded-lg border border-gray-200 bg-white px-3 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
       >
         {MONTHS.map((m, i) => (
@@ -31,6 +32,7 @@ export function DashboardFilters({ currentMonth, currentYear }: { currentMonth: 
       <select
         value={currentYear}
         onChange={e => update('year', e.target.value)}
+        aria-label="Year"
         className="h-9 rounded-lg border border-gray-200 bg-white px-3 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
       >
         {years.map(y => <option key={y} value={y}>{y}</option>)}

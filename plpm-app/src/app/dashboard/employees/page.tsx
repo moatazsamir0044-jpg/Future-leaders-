@@ -29,7 +29,7 @@ export default async function EmployeesPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         {[
           { label: 'Total Employees', value: String(active.length), color: 'text-gray-900' },
           { label: 'Sites', value: String((sites ?? []).length), color: 'text-blue-600' },

@@ -39,7 +39,7 @@ export default async function PayrollPage({ searchParams }: { searchParams: Prom
       </div>
 
       {/* Summary */}
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         {[
           { label: 'Payroll Sheets', value: String(periods?.length ?? 0), color: 'text-blue-600' },
           { label: 'Total Net', value: `EGP ${formatCurrency(totalNet)}`, color: 'text-gray-900' },
@@ -79,7 +79,8 @@ export default async function PayrollPage({ searchParams }: { searchParams: Prom
                   <tr>
                     <td colSpan={7} className="px-5 py-12 text-center text-gray-400">
                       <FileText className="h-8 w-8 mx-auto mb-2 opacity-40" />
-                      No payroll sheets yet. Create one to get started.
+                      <p className="font-medium text-gray-500">No payroll sheets for {formatMonthYear(month, year)}</p>
+                      <p className="text-sm mt-1">Use &quot;New Payroll Sheet&quot; above — it can prefill all active employees from the site&apos;s roster. Or switch to another month with the filter.</p>
                     </td>
                   </tr>
                 ) : (periods ?? []).map(p => {
