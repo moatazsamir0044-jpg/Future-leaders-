@@ -6,38 +6,47 @@ import { createClient } from '@/lib/supabase/client'
 import { formatCurrency } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Modal } from '@/components/ui/modal'
-import { Plus, Pencil, Trash2 } from 'lucide-react'
-import type { PayrollRecord } from '@/types'
+import { Plus, Pencil, Trash2, Calculator } from 'lucide-react'
+import type { Employee, PayrollRecord } from '@/types'
 
 const FIELDS = [
-  { key: 'attendance_days', label: 'Attendance', type: 'number', step: '0.5' },
-  { key: 'absence_days', label: 'Absence', type: 'number', step: '0.5' },
-  { key: 'net_days', label: 'Net Days', type: 'number', step: '0.01' },
-  { key: 'monthly_leave_days', label: 'Monthly Leave', type: 'number', step: '0.5' },
-  { key: 'annual_leave_days', label: 'Annual Leave', type: 'number', step: '0.5' },
-  { key: 'absence_no_permission', label: 'Abs. No Perm.', type: 'number', step: '0.5' },
-  { key: 'overtime_hours', label: 'OT Hours', type: 'number', step: '0.5' },
-  { key: 'less_hours', label: 'Less Hours', type: 'number', step: '0.5' },
-  { key: 'base_monthly_salary', label: 'Monthly Salary', type: 'number', step: '0.01' },
-  { key: 'daily_wage', label: 'Daily Wage', type: 'number', step: '0.01' },
-  { key: 'bonuses', label: 'Bonuses', type: 'number', step: '0.01' },
-  { key: 'transportation_amount', label: 'Transport', type: 'number', step: '0.01' },
-  { key: 'transportation_category', label: 'Transport Cat.', type: 'number', step: '0.01' },
-  { key: 'advance', label: 'Advance (سلف)', type: 'number', step: '0.01' },
-  { key: 'insurance', label: 'Insurance', type: 'number', step: '0.01' },
-  { key: 'deductions', label: 'Deductions', type: 'number', step: '0.01' },
-  { key: 'penalties', label: 'Penalties', type: 'number', step: '0.01' },
-  { key: 'total_gross', label: 'Gross Total', type: 'number', step: '0.01' },
-  { key: 'net_salary', label: 'Net Salary', type: 'number', step: '0.01' },
+  { key: 'attendance_days', label: 'Attendance Days', step: '0.5', group: 'days' },
+  { key: 'absence_days', label: 'Absence Days', step: '0.5', group: 'days' },
+  { key: 'monthly_leave_days', label: 'Monthly Leave', step: '0.5', group: 'days' },
+  { key: 'annual_leave_days', label: 'Annual Leave', step: '0.5', group: 'days' },
+  { key: 'absence_no_permission', label: 'Absence (No Permission)', step: '0.5', group: 'days' },
+  { key: 'holiday_extra_days', label: 'Holiday Extra Days', step: '0.5', group: 'days' },
+  { key: 'net_days', label: 'Net Days (paid)', step: '0.01', group: 'days' },
+  { key: 'overtime_hours', label: 'Overtime Hours', step: '0.5', group: 'hours' },
+  { key: 'less_hours', label: 'Less Hours', step: '0.5', group: 'hours' },
+  { key: 'base_monthly_salary', label: 'Monthly Salary', step: '0.01', group: 'earnings' },
+  { key: 'daily_wage', label: 'Daily Wage', step: '0.01', group: 'earnings' },
+  { key: 'bonuses', label: 'Bonuses', step: '0.01', group: 'earnings' },
+  { key: 'transportation_amount', label: 'Transport Allowance', step: '0.01', group: 'earnings' },
+  { key: 'transportation_category', label: 'Transport Category', step: '0.01', group: 'earnings' },
+  { key: 'advance', label: 'Advance (سلف)', step: '0.01', group: 'deductions' },
+  { key: 'insurance', label: 'Insurance', step: '0.01', group: 'deductions' },
+  { key: 'deductions', label: 'Deductions', step: '0.01', group: 'deductions' },
+  { key: 'penalties', label: 'Penalties', step: '0.01', group: 'deductions' },
+  { key: 'total_gross', label: 'Gross Total', step: '0.01', group: 'totals' },
+  { key: 'net_salary', label: 'Net Salary', step: '0.01', group: 'totals' },
 ] as const
 
 type FieldKey = typeof FIELDS[number]['key']
 type FormData = { worker_number: string; employee_name: string } & Record<FieldKey, string>
 
+const SECTIONS: { group: string; title: string }[] = [
+  { group: 'days', title: 'Days & Attendance' },
+  { group: 'hours', title: 'Hours' },
+  { group: 'earnings', title: 'Earnings' },
+  { group: 'deductions', title: 'Deductions' },
+]
+
 const emptyForm = (): FormData => ({
   worker_number: '', employee_name: '',
   attendance_days: '0', absence_days: '0', net_days: '0',
   monthly_leave_days: '0', annual_leave_days: '0', absence_no_permission: '0',
+  holiday_extra_days: '0',
   overtime_hours: '0', less_hours: '0',
   base_monthly_salary: '0', daily_wage: '0',
   bonuses: '0', transportation_amount: '0', transportation_category: '0',
@@ -55,6 +64,7 @@ function recordToForm(r: PayrollRecord): FormData {
     monthly_leave_days: String(r.monthly_leave_days),
     annual_leave_days: String(r.annual_leave_days),
     absence_no_permission: String(r.absence_no_permission),
+    holiday_extra_days: String(r.holiday_extra_days ?? 0),
     overtime_hours: String(r.overtime_hours),
     less_hours: String(r.less_hours),
     base_monthly_salary: String(r.base_monthly_salary),
@@ -71,6 +81,25 @@ function recordToForm(r: PayrollRecord): FormData {
   }
 }
 
+const round2 = (x: number) => Math.round(x * 100) / 100
+
+// gross = net_days × daily_wage + holiday extra days × daily_wage
+//         + overtime hours × (daily_wage / 8) − less hours × (daily_wage / 8)
+//         + bonuses + transport allowance
+// net   = gross − advance − insurance − deductions − penalties
+function calcTotals(form: FormData): { gross: number; net: number } {
+  const n = (k: FieldKey) => parseFloat(form[k]) || 0
+  const hourlyRate = n('daily_wage') / 8
+  const gross = n('net_days') * n('daily_wage')
+    + n('holiday_extra_days') * n('daily_wage')
+    + n('overtime_hours') * hourlyRate
+    - n('less_hours') * hourlyRate
+    + n('bonuses')
+    + n('transportation_amount')
+  const net = gross - n('advance') - n('insurance') - n('deductions') - n('penalties')
+  return { gross: round2(gross), net: round2(net) }
+}
+
 export function PayrollTable({ periodId, records: initialRecords, periodStatus, siteId }: {
   periodId: string
   records: PayrollRecord[]
@@ -81,6 +110,8 @@ export function PayrollTable({ periodId, records: initialRecords, periodStatus, 
   const [modalOpen, setModalOpen] = useState(false)
   const [editRecord, setEditRecord] = useState<PayrollRecord | null>(null)
   const [form, setForm] = useState<FormData>(emptyForm())
+  const [autoCalc, setAutoCalc] = useState(true)
+  const [roster, setRoster] = useState<Employee[] | null>(null)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [tableError, setTableError] = useState('')
@@ -88,22 +119,54 @@ export function PayrollTable({ periodId, records: initialRecords, periodStatus, 
   const router = useRouter()
   const canEdit = periodStatus === 'draft' || periodStatus === 'rejected'
 
+  async function loadRoster() {
+    if (roster !== null) return
+    const supabase = createClient()
+    const { data } = await supabase
+      .from('employees')
+      .select('*')
+      .eq('site_id', siteId)
+      .eq('active', true)
+      .order('worker_number')
+    setRoster(data ?? [])
+  }
+
   function openNew() {
     setEditRecord(null)
     setForm(emptyForm())
+    setAutoCalc(true)
     setError('')
     setModalOpen(true)
+    void loadRoster()
   }
 
   function openEdit(r: PayrollRecord) {
     setEditRecord(r)
-    setForm(recordToForm(r))
+    const f = recordToForm(r)
+    setForm(f)
+    // Keep auto mode only if the stored totals already match the formula,
+    // so existing hand-entered figures are never silently overwritten.
+    const calc = calcTotals(f)
+    setAutoCalc(Math.abs(calc.gross - Number(r.total_gross)) < 0.01 && Math.abs(calc.net - Number(r.net_salary)) < 0.01)
     setError('')
     setModalOpen(true)
+    void loadRoster()
   }
 
   function setField(key: string, value: string) {
     setForm(f => ({ ...f, [key]: value }))
+  }
+
+  function prefillFromRoster(employeeId: string) {
+    const emp = (roster ?? []).find(e => e.id === employeeId)
+    if (!emp) return
+    setForm(f => ({
+      ...f,
+      worker_number: emp.worker_number != null ? String(emp.worker_number) : f.worker_number,
+      employee_name: emp.name,
+      base_monthly_salary: String(emp.base_monthly_salary),
+      daily_wage: String(emp.daily_wage),
+    }))
   }
 
   async function handleSave() {
@@ -111,12 +174,14 @@ export function PayrollTable({ periodId, records: initialRecords, periodStatus, 
     setSaving(true)
     setError('')
     const supabase = createClient()
+    const calc = calcTotals(form)
     const payload = {
       period_id: periodId,
       site_id: siteId,
       worker_number: form.worker_number ? parseInt(form.worker_number) : null,
       employee_name: form.employee_name.trim(),
       ...Object.fromEntries(FIELDS.map(f => [f.key, parseFloat(form[f.key]) || 0])),
+      ...(autoCalc ? { total_gross: calc.gross, net_salary: calc.net } : {}),
     }
     let result
     if (editRecord) {
@@ -243,36 +308,123 @@ export function PayrollTable({ periodId, records: initialRecords, periodStatus, 
 
       {/* Edit / Add modal */}
       <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editRecord ? 'Edit Employee' : 'Add Employee'} size="xl">
-        <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-1">
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">Worker #</label>
-              <input type="number" value={form.worker_number} onChange={e => setField('worker_number', e.target.value)}
-                className="w-full h-8 border border-gray-300 rounded-lg px-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">Employee Name *</label>
-              <input type="text" value={form.employee_name} onChange={e => setField('employee_name', e.target.value)}
-                dir="rtl"
-                className="w-full h-8 border border-gray-300 rounded-lg px-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="اسم الموظف" />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-3 gap-3">
-            {FIELDS.map(f => (
-              <div key={f.key}>
-                <label className="block text-xs font-medium text-gray-600 mb-1">{f.label}</label>
-                <input
-                  type="number"
-                  step={f.step}
-                  value={form[f.key]}
-                  onChange={e => setField(f.key, e.target.value)}
-                  className="w-full h-8 border border-gray-300 rounded-lg px-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
+        <div className="space-y-5 max-h-[70vh] overflow-y-auto pr-1">
+          {/* Employee identity */}
+          <section>
+            <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Employee</h3>
+            {!editRecord && (roster ?? []).length > 0 && (
+              <div className="mb-3">
+                <label className="block text-xs font-medium text-gray-600 mb-1">Prefill from roster (optional)</label>
+                <select
+                  defaultValue=""
+                  onChange={e => prefillFromRoster(e.target.value)}
+                  className="w-full h-8 border border-gray-300 rounded-lg px-3 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">Choose an employee to fill name, number, salary & wage…</option>
+                  {(roster ?? []).map(emp => (
+                    <option key={emp.id} value={emp.id}>
+                      {emp.worker_number != null ? `#${emp.worker_number} — ` : ''}{emp.name}
+                    </option>
+                  ))}
+                </select>
               </div>
-            ))}
-          </div>
+            )}
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Worker #</label>
+                <input type="number" value={form.worker_number} onChange={e => setField('worker_number', e.target.value)}
+                  className="w-full h-8 border border-gray-300 rounded-lg px-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Employee Name *</label>
+                <input type="text" value={form.employee_name} onChange={e => setField('employee_name', e.target.value)}
+                  dir="rtl"
+                  className="w-full h-8 border border-gray-300 rounded-lg px-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="اسم الموظف" />
+              </div>
+            </div>
+          </section>
+
+          {/* Grouped numeric fields */}
+          {SECTIONS.map(section => (
+            <section key={section.group}>
+              <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">{section.title}</h3>
+              <div className="grid grid-cols-3 gap-3">
+                {FIELDS.filter(f => f.group === section.group).map(f => (
+                  <div key={f.key}>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">{f.label}</label>
+                    <input
+                      type="number"
+                      step={f.step}
+                      value={form[f.key]}
+                      onChange={e => setField(f.key, e.target.value)}
+                      className="w-full h-8 border border-gray-300 rounded-lg px-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                ))}
+              </div>
+            </section>
+          ))}
+
+          {/* Totals */}
+          <section className="bg-gray-50 border border-gray-200 rounded-xl p-4 space-y-3">
+            <div className="flex items-center justify-between gap-3 flex-wrap">
+              <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide flex items-center gap-1.5">
+                <Calculator className="h-3.5 w-3.5" /> Totals
+              </h3>
+              <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={autoCalc}
+                  onChange={e => {
+                    const on = e.target.checked
+                    setAutoCalc(on)
+                    if (on) {
+                      const calc = calcTotals(form)
+                      setForm(f => ({ ...f, total_gross: String(calc.gross), net_salary: String(calc.net) }))
+                    }
+                  }}
+                  className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                />
+                Calculate Gross &amp; Net automatically
+              </label>
+            </div>
+
+            {(() => {
+              const calc = calcTotals(form)
+              return (
+                <>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Gross Total</label>
+                      <input
+                        type="number" step="0.01"
+                        value={autoCalc ? String(calc.gross) : form.total_gross}
+                        onChange={e => setField('total_gross', e.target.value)}
+                        disabled={autoCalc}
+                        className="w-full h-9 border border-gray-300 rounded-lg px-3 text-sm font-mono font-semibold text-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-blue-50/50 disabled:cursor-not-allowed"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Net Salary</label>
+                      <input
+                        type="number" step="0.01"
+                        value={autoCalc ? String(calc.net) : form.net_salary}
+                        onChange={e => setField('net_salary', e.target.value)}
+                        disabled={autoCalc}
+                        className="w-full h-9 border border-gray-300 rounded-lg px-3 text-sm font-mono font-bold text-green-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-green-50/50 disabled:cursor-not-allowed"
+                      />
+                    </div>
+                  </div>
+                  <p className="text-xs text-gray-500 leading-relaxed">
+                    Formula: net days × daily wage + holiday extra days × daily wage + overtime × (daily wage ÷ 8) − less hours × (daily wage ÷ 8) + bonuses + transport = <span className="font-mono">{formatCurrency(calc.gross)}</span> gross;
+                    minus advance, insurance, deductions &amp; penalties = <span className="font-mono">{formatCurrency(calc.net)}</span> net.
+                    {!autoCalc && ' You are entering totals manually — the calculated values are shown for reference only.'}
+                  </p>
+                </>
+              )
+            })()}
+          </section>
 
           {error && <p className="text-sm text-red-600">{error}</p>}
 
