@@ -6,6 +6,8 @@ import { createClient } from '@/lib/supabase/client'
 import { formatCurrency } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Modal } from '@/components/ui/modal'
+import { ConfirmDialog } from '@/components/ui/confirm-dialog'
+import { useToast } from '@/components/ui/toast'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Plus, Pencil, Trash2, Truck, Home, Receipt } from 'lucide-react'
 import type { ExpenseTransportation, ExpenseAccommodation, ExpenseItem } from '@/types'
@@ -31,8 +33,11 @@ function TransportationTable({
   const [form, setForm] = useState({ vehicle_name: '', daily_cost: '0', days_count: '0' })
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const [deleteTarget, setDeleteTarget] = useState<ExpenseTransportation | null>(null)
+  const [deleting, setDeleting] = useState(false)
   const [, startTransition] = useTransition()
   const router = useRouter()
+  const toast = useToast()
 
   function openNew() { setEditing(null); setForm({ vehicle_name: '', daily_cost: '0', days_count: '0' }); setError(''); setOpen(true) }
   function openEdit(r: ExpenseTransportation) {
@@ -67,21 +72,31 @@ function TransportationTable({
     setRows(updated)
     const recalcErr = await recalcTotals(supabase, reportId, { total_transportation: updated.reduce((s, r) => s + Number(r.total), 0) })
     if (recalcErr) setError(`Saved, but report totals could not be updated: ${recalcErr}`)
+    toast(editing ? `Updated "${payload.vehicle_name}"` : `Added "${payload.vehicle_name}"`)
     setOpen(false)
     startTransition(() => router.refresh())
     setSaving(false)
   }
 
   async function handleDelete(r: ExpenseTransportation) {
-    if (!confirm(`Delete "${r.vehicle_name}"?`)) return
+    setDeleting(true)
     setError('')
     const supabase = createClient()
     const { error: deleteErr } = await supabase.from('expense_transportation').delete().eq('id', r.id)
-    if (deleteErr) { setError(`Could not delete "${r.vehicle_name}": ${deleteErr.message}`); return }
+    if (deleteErr) {
+      setDeleting(false)
+      setDeleteTarget(null)
+      setError(`Could not delete "${r.vehicle_name}": ${deleteErr.message}`)
+      toast(`Could not delete "${r.vehicle_name}"`, 'error')
+      return
+    }
     const updated = rows.filter(x => x.id !== r.id)
     setRows(updated)
     const recalcErr = await recalcTotals(supabase, reportId, { total_transportation: updated.reduce((s, x) => s + Number(x.total), 0) })
     if (recalcErr) setError(`Deleted, but report totals could not be updated: ${recalcErr}`)
+    toast(`Deleted "${r.vehicle_name}"`)
+    setDeleting(false)
+    setDeleteTarget(null)
     startTransition(() => router.refresh())
   }
 
@@ -125,8 +140,8 @@ function TransportationTable({
                 {canEdit && (
                   <td className="px-3 py-2.5">
                     <div className="flex gap-1 justify-end">
-                      <button onClick={() => openEdit(r)} className="text-gray-400 hover:text-blue-600 p-1 rounded"><Pencil className="h-3.5 w-3.5" /></button>
-                      <button onClick={() => handleDelete(r)} className="text-gray-400 hover:text-red-600 p-1 rounded"><Trash2 className="h-3.5 w-3.5" /></button>
+                      <button onClick={() => openEdit(r)} aria-label={`Edit ${r.vehicle_name}`} className="text-gray-400 hover:text-blue-600 p-1 rounded"><Pencil className="h-3.5 w-3.5" /></button>
+                      <button onClick={() => setDeleteTarget(r)} aria-label={`Delete ${r.vehicle_name}`} className="text-gray-400 hover:text-red-600 p-1 rounded"><Trash2 className="h-3.5 w-3.5" /></button>
                     </div>
                   </td>
                 )}
@@ -144,6 +159,15 @@ function TransportationTable({
           )}
         </table>
       </CardContent>
+
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        title="Delete Transportation Entry"
+        message={<>Delete <strong>{deleteTarget?.vehicle_name}</strong>? Report totals will be recalculated. This cannot be undone.</>}
+        loading={deleting}
+        onConfirm={() => deleteTarget && handleDelete(deleteTarget)}
+        onClose={() => setDeleteTarget(null)}
+      />
 
       <Modal open={open} onClose={() => setOpen(false)} title={editing ? 'Edit Vehicle' : 'Add Vehicle'} size="sm">
         <div className="space-y-4">
@@ -189,8 +213,11 @@ function AccommodationTable({
   const [form, setForm] = useState({ apartment_name: '', rent_amount: '0' })
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const [deleteTarget, setDeleteTarget] = useState<ExpenseAccommodation | null>(null)
+  const [deleting, setDeleting] = useState(false)
   const [, startTransition] = useTransition()
   const router = useRouter()
+  const toast = useToast()
 
   function openNew() { setEditing(null); setForm({ apartment_name: '', rent_amount: '0' }); setError(''); setOpen(true) }
   function openEdit(r: ExpenseAccommodation) {
@@ -222,21 +249,31 @@ function AccommodationTable({
     setRows(updated)
     const recalcErr = await recalcTotals(supabase, reportId, { total_accommodation: updated.reduce((s, r) => s + Number(r.rent_amount), 0) })
     if (recalcErr) setError(`Saved, but report totals could not be updated: ${recalcErr}`)
+    toast(editing ? `Updated "${payload.apartment_name}"` : `Added "${payload.apartment_name}"`)
     setOpen(false)
     startTransition(() => router.refresh())
     setSaving(false)
   }
 
   async function handleDelete(r: ExpenseAccommodation) {
-    if (!confirm(`Delete "${r.apartment_name}"?`)) return
+    setDeleting(true)
     setError('')
     const supabase = createClient()
     const { error: deleteErr } = await supabase.from('expense_accommodation').delete().eq('id', r.id)
-    if (deleteErr) { setError(`Could not delete "${r.apartment_name}": ${deleteErr.message}`); return }
+    if (deleteErr) {
+      setDeleting(false)
+      setDeleteTarget(null)
+      setError(`Could not delete "${r.apartment_name}": ${deleteErr.message}`)
+      toast(`Could not delete "${r.apartment_name}"`, 'error')
+      return
+    }
     const updated = rows.filter(x => x.id !== r.id)
     setRows(updated)
     const recalcErr = await recalcTotals(supabase, reportId, { total_accommodation: updated.reduce((s, x) => s + Number(x.rent_amount), 0) })
     if (recalcErr) setError(`Deleted, but report totals could not be updated: ${recalcErr}`)
+    toast(`Deleted "${r.apartment_name}"`)
+    setDeleting(false)
+    setDeleteTarget(null)
     startTransition(() => router.refresh())
   }
 
@@ -276,8 +313,8 @@ function AccommodationTable({
                 {canEdit && (
                   <td className="px-3 py-2.5">
                     <div className="flex gap-1 justify-end">
-                      <button onClick={() => openEdit(r)} className="text-gray-400 hover:text-blue-600 p-1 rounded"><Pencil className="h-3.5 w-3.5" /></button>
-                      <button onClick={() => handleDelete(r)} className="text-gray-400 hover:text-red-600 p-1 rounded"><Trash2 className="h-3.5 w-3.5" /></button>
+                      <button onClick={() => openEdit(r)} aria-label={`Edit ${r.apartment_name}`} className="text-gray-400 hover:text-blue-600 p-1 rounded"><Pencil className="h-3.5 w-3.5" /></button>
+                      <button onClick={() => setDeleteTarget(r)} aria-label={`Delete ${r.apartment_name}`} className="text-gray-400 hover:text-red-600 p-1 rounded"><Trash2 className="h-3.5 w-3.5" /></button>
                     </div>
                   </td>
                 )}
@@ -295,6 +332,15 @@ function AccommodationTable({
           )}
         </table>
       </CardContent>
+
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        title="Delete Accommodation Entry"
+        message={<>Delete <strong>{deleteTarget?.apartment_name}</strong>? Report totals will be recalculated. This cannot be undone.</>}
+        loading={deleting}
+        onConfirm={() => deleteTarget && handleDelete(deleteTarget)}
+        onClose={() => setDeleteTarget(null)}
+      />
 
       <Modal open={open} onClose={() => setOpen(false)} title={editing ? 'Edit Apartment' : 'Add Apartment'} size="sm">
         <div className="space-y-4">
@@ -330,8 +376,11 @@ function ItemsTable({
   const [form, setForm] = useState({ category: 'other', description: '', amount: '0' })
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const [deleteTarget, setDeleteTarget] = useState<ExpenseItem | null>(null)
+  const [deleting, setDeleting] = useState(false)
   const [, startTransition] = useTransition()
   const router = useRouter()
+  const toast = useToast()
 
   function openNew() { setEditing(null); setForm({ category: 'other', description: '', amount: '0' }); setError(''); setOpen(true) }
   function openEdit(r: ExpenseItem) {
@@ -364,21 +413,31 @@ function ItemsTable({
     setRows(updated)
     const recalcErr = await recalcTotals(supabase, reportId, { total_other: updated.reduce((s, r) => s + Number(r.amount), 0) })
     if (recalcErr) setError(`Saved, but report totals could not be updated: ${recalcErr}`)
+    toast(editing ? `Updated "${payload.description}"` : `Added "${payload.description}"`)
     setOpen(false)
     startTransition(() => router.refresh())
     setSaving(false)
   }
 
   async function handleDelete(r: ExpenseItem) {
-    if (!confirm(`Delete "${r.description}"?`)) return
+    setDeleting(true)
     setError('')
     const supabase = createClient()
     const { error: deleteErr } = await supabase.from('expense_items').delete().eq('id', r.id)
-    if (deleteErr) { setError(`Could not delete "${r.description}": ${deleteErr.message}`); return }
+    if (deleteErr) {
+      setDeleting(false)
+      setDeleteTarget(null)
+      setError(`Could not delete "${r.description}": ${deleteErr.message}`)
+      toast(`Could not delete "${r.description}"`, 'error')
+      return
+    }
     const updated = rows.filter(x => x.id !== r.id)
     setRows(updated)
     const recalcErr = await recalcTotals(supabase, reportId, { total_other: updated.reduce((s, x) => s + Number(x.amount), 0) })
     if (recalcErr) setError(`Deleted, but report totals could not be updated: ${recalcErr}`)
+    toast(`Deleted "${r.description}"`)
+    setDeleting(false)
+    setDeleteTarget(null)
     startTransition(() => router.refresh())
   }
 
@@ -422,8 +481,8 @@ function ItemsTable({
                 {canEdit && (
                   <td className="px-3 py-2.5">
                     <div className="flex gap-1 justify-end">
-                      <button onClick={() => openEdit(r)} className="text-gray-400 hover:text-blue-600 p-1 rounded"><Pencil className="h-3.5 w-3.5" /></button>
-                      <button onClick={() => handleDelete(r)} className="text-gray-400 hover:text-red-600 p-1 rounded"><Trash2 className="h-3.5 w-3.5" /></button>
+                      <button onClick={() => openEdit(r)} aria-label={`Edit ${r.description}`} className="text-gray-400 hover:text-blue-600 p-1 rounded"><Pencil className="h-3.5 w-3.5" /></button>
+                      <button onClick={() => setDeleteTarget(r)} aria-label={`Delete ${r.description}`} className="text-gray-400 hover:text-red-600 p-1 rounded"><Trash2 className="h-3.5 w-3.5" /></button>
                     </div>
                   </td>
                 )}
@@ -441,6 +500,15 @@ function ItemsTable({
           )}
         </table>
       </CardContent>
+
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        title="Delete Expense Item"
+        message={<>Delete <strong>{deleteTarget?.description}</strong>? Report totals will be recalculated. This cannot be undone.</>}
+        loading={deleting}
+        onConfirm={() => deleteTarget && handleDelete(deleteTarget)}
+        onClose={() => setDeleteTarget(null)}
+      />
 
       <Modal open={open} onClose={() => setOpen(false)} title={editing ? 'Edit Item' : 'Add Item'} size="sm">
         <div className="space-y-4">

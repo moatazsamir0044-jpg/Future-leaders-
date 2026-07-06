@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Modal } from '@/components/ui/modal'
 import { Button } from '@/components/ui/button'
+import { useToast } from '@/components/ui/toast'
 import { Plus } from 'lucide-react'
 import type { Site } from '@/types'
 
@@ -14,6 +15,7 @@ export function NewExpenseButton({ sites, month, year }: { sites: Site[]; month:
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const router = useRouter()
+  const toast = useToast()
 
   async function handleCreate() {
     if (!siteId) return
@@ -30,6 +32,7 @@ export function NewExpenseButton({ sites, month, year }: { sites: Site[]; month:
       setError(err.code === '23505' ? 'An expense report already exists for this site and month.' : err.message)
     } else {
       setOpen(false)
+      toast('Expense report created')
       router.push(`/dashboard/expenses/${data.id}`)
     }
   }

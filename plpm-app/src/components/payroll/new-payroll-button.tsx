@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Modal } from '@/components/ui/modal'
 import { Button } from '@/components/ui/button'
+import { useToast } from '@/components/ui/toast'
 import { Plus } from 'lucide-react'
 import type { Site } from '@/types'
 
@@ -17,6 +18,7 @@ export function NewPayrollButton({ sites, month, year }: { sites: Site[]; month:
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const router = useRouter()
+  const toast = useToast()
 
   async function handleSiteChange(id: string) {
     setSiteId(id)
@@ -83,6 +85,9 @@ export function NewPayrollButton({ sites, month, year }: { sites: Site[]; month:
 
     setLoading(false)
     setOpen(false)
+    toast(prefill && (rosterCount ?? 0) > 0
+      ? `Payroll sheet created with ${rosterCount} employee${rosterCount === 1 ? '' : 's'} from the roster`
+      : 'Payroll sheet created')
     router.push(`/dashboard/payroll/${data.id}`)
   }
 

@@ -6,6 +6,8 @@ import { createClient } from '@/lib/supabase/client'
 import { formatCurrency } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Modal } from '@/components/ui/modal'
+import { ConfirmDialog } from '@/components/ui/confirm-dialog'
+import { useToast } from '@/components/ui/toast'
 import { Plus, Pencil, Trash2, Calculator } from 'lucide-react'
 import type { Employee, PayrollRecord } from '@/types'
 
@@ -115,8 +117,11 @@ export function PayrollTable({ periodId, records: initialRecords, periodStatus, 
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [tableError, setTableError] = useState('')
+  const [deleteTarget, setDeleteTarget] = useState<PayrollRecord | null>(null)
+  const [deleting, setDeleting] = useState(false)
   const [, startTransition] = useTransition()
   const router = useRouter()
+  const toast = useToast()
   const canEdit = periodStatus === 'draft' || periodStatus === 'rejected'
 
   async function loadRoster() {
@@ -202,18 +207,22 @@ export function PayrollTable({ periodId, records: initialRecords, periodStatus, 
     const { error: totalsErr } = await supabase.from('payroll_periods').update({ total_gross: totalGross, total_net: totalNet }).eq('id', periodId)
     if (totalsErr) setTableError(`Record saved, but sheet totals could not be updated: ${totalsErr.message}`)
 
+    toast(editRecord ? `Updated record for ${payload.employee_name}` : `Added ${payload.employee_name} to the sheet`)
     setSaving(false)
     setModalOpen(false)
     startTransition(() => router.refresh())
   }
 
   async function handleDelete(r: PayrollRecord) {
-    if (!confirm(`Delete record for ${r.employee_name}?`)) return
+    setDeleting(true)
     setTableError('')
     const supabase = createClient()
     const { error: deleteErr } = await supabase.from('payroll_records').delete().eq('id', r.id)
     if (deleteErr) {
+      setDeleting(false)
+      setDeleteTarget(null)
       setTableError(`Could not delete ${r.employee_name}: ${deleteErr.message}`)
+      toast(`Could not delete ${r.employee_name}`, 'error')
       return
     }
     const updated = records.filter(rec => rec.id !== r.id)
@@ -222,6 +231,9 @@ export function PayrollTable({ periodId, records: initialRecords, periodStatus, 
     const totalNet = updated.reduce((s: number, rec: PayrollRecord) => s + Number(rec.net_salary), 0)
     const { error: totalsErr } = await supabase.from('payroll_periods').update({ total_gross: totalGross, total_net: totalNet }).eq('id', periodId)
     if (totalsErr) setTableError(`Record deleted, but sheet totals could not be updated: ${totalsErr.message}`)
+    toast(`Deleted record for ${r.employee_name}`)
+    setDeleting(false)
+    setDeleteTarget(null)
     startTransition(() => router.refresh())
   }
 
@@ -284,7 +296,7 @@ export function PayrollTable({ periodId, records: initialRecords, periodStatus, 
                       <button onClick={() => openEdit(r)} className="text-gray-400 hover:text-blue-600 p-1 rounded transition-colors">
                         <Pencil className="h-3.5 w-3.5" />
                       </button>
-                      <button onClick={() => handleDelete(r)} className="text-gray-400 hover:text-red-600 p-1 rounded transition-colors">
+                      <button onClick={() => setDeleteTarget(r)} aria-label={`Delete ${r.employee_name}`} className="text-gray-400 hover:text-red-600 p-1 rounded transition-colors">
                         <Trash2 className="h-3.5 w-3.5" />
                       </button>
                     </div>
@@ -305,6 +317,16 @@ export function PayrollTable({ periodId, records: initialRecords, periodStatus, 
           )}
         </table>
       </div>
+
+      {/* Delete confirmation */}
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        title="Delete Payroll Record"
+        message={<>Delete the record for <strong dir="rtl">{deleteTarget?.employee_name}</strong>? Sheet totals will be recalculated. This cannot be undone.</>}
+        loading={deleting}
+        onConfirm={() => deleteTarget && handleDelete(deleteTarget)}
+        onClose={() => setDeleteTarget(null)}
+      />
 
       {/* Edit / Add modal */}
       <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editRecord ? 'Edit Employee' : 'Add Employee'} size="xl">

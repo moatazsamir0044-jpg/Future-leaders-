@@ -1,6 +1,7 @@
 export const dynamic = 'force-dynamic'
 
 import { createClient } from '@/lib/supabase/server'
+import Link from 'next/link'
 import { resolvePeriod } from '@/lib/period'
 import { formatCurrency, formatMonthYear } from '@/lib/utils'
 import { StatusBadge } from '@/components/ui/badge'
@@ -112,7 +113,12 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
                 </thead>
                 <tbody className="divide-y divide-gray-50">
                   {(payrollPeriods ?? []).length === 0 ? (
-                    <tr><td colSpan={4} className="px-4 py-8 text-center text-gray-400">No payroll records for this period</td></tr>
+                    <tr>
+                      <td colSpan={4} className="px-4 py-8 text-center text-gray-400">
+                        No payroll records for this period —{' '}
+                        <Link href={`/dashboard/payroll?month=${month}&year=${year}`} className="text-blue-600 hover:text-blue-800 font-medium">create a sheet →</Link>
+                      </td>
+                    </tr>
                   ) : (payrollPeriods ?? []).map(p => (
                     <tr key={p.id} className="hover:bg-gray-50/50 transition-colors">
                       <td className="px-4 py-3 font-medium text-gray-900 truncate max-w-[140px]">{(p.site as { name: string })?.name}</td>
@@ -152,7 +158,12 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
                 </thead>
                 <tbody className="divide-y divide-gray-50">
                   {(expenseReports ?? []).length === 0 ? (
-                    <tr><td colSpan={4} className="px-4 py-8 text-center text-gray-400">No expense reports for this period</td></tr>
+                    <tr>
+                      <td colSpan={4} className="px-4 py-8 text-center text-gray-400">
+                        No expense reports for this period —{' '}
+                        <Link href={`/dashboard/expenses?month=${month}&year=${year}`} className="text-purple-600 hover:text-purple-800 font-medium">create a report →</Link>
+                      </td>
+                    </tr>
                   ) : (expenseReports ?? []).map(e => (
                     <tr key={e.id} className="hover:bg-gray-50/50 transition-colors">
                       <td className="px-4 py-3 font-medium text-gray-900 truncate max-w-[140px]">{(e.site as { name: string })?.name}</td>

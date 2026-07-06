@@ -5,6 +5,8 @@ import { createClient } from '@/lib/supabase/client'
 import { formatCurrency } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Modal } from '@/components/ui/modal'
+import { ConfirmDialog } from '@/components/ui/confirm-dialog'
+import { useToast } from '@/components/ui/toast'
 import { Plus, Pencil, Trash2, UserCheck, UserX } from 'lucide-react'
 import type { Employee, Site } from '@/types'
 
@@ -41,6 +43,9 @@ export function EmployeeManager({ employees: initial, sites }: { employees: Empl
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [filterSite, setFilterSite] = useState('')
+  const [deleteTarget, setDeleteTarget] = useState<Employee | null>(null)
+  const [deleting, setDeleting] = useState(false)
+  const toast = useToast()
 
   function openNew() { setEditing(null); setForm(emptyForm()); setError(''); setOpen(true) }
   function openEdit(e: Employee) { setEditing(e); setForm(employeeToForm(e)); setError(''); setOpen(true) }
@@ -74,20 +79,27 @@ export function EmployeeManager({ employees: initial, sites }: { employees: Empl
       ? employees.map(e => e.id === editing.id ? result.data : e)
       : [...employees, result.data]
     setEmployees(updated as Employee[])
+    toast(editing ? `Updated ${form.name.trim()}` : `Added ${form.name.trim()} to the roster`)
     setSaving(false); setOpen(false)
   }
 
   async function handleToggleActive(e: Employee) {
     const supabase = createClient()
-    await supabase.from('employees').update({ active: !e.active }).eq('id', e.id)
+    const { error: err } = await supabase.from('employees').update({ active: !e.active }).eq('id', e.id)
+    if (err) { toast(`Could not update ${e.name}: ${err.message}`, 'error'); return }
     setEmployees(prev => prev.map(x => x.id === e.id ? { ...x, active: !x.active } : x))
+    toast(e.active ? `${e.name} deactivated — they will no longer be prefilled into new payroll sheets` : `${e.name} activated`)
   }
 
   async function handleDelete(e: Employee) {
-    if (!confirm(`Delete ${e.name}? This cannot be undone.`)) return
+    setDeleting(true)
     const supabase = createClient()
-    await supabase.from('employees').delete().eq('id', e.id)
+    const { error: err } = await supabase.from('employees').delete().eq('id', e.id)
+    setDeleting(false)
+    setDeleteTarget(null)
+    if (err) { toast(`Could not delete ${e.name}: ${err.message}`, 'error'); return }
     setEmployees(prev => prev.filter(x => x.id !== e.id))
+    toast(`Deleted ${e.name}`)
   }
 
   const filtered = filterSite ? employees.filter(e => e.site_id === filterSite) : employees
@@ -121,7 +133,13 @@ export function EmployeeManager({ employees: initial, sites }: { employees: Empl
         </thead>
         <tbody className="divide-y divide-gray-50">
           {filtered.length === 0 ? (
-            <tr><td colSpan={8} className="px-4 py-10 text-center text-gray-400">No employees found.</td></tr>
+            <tr>
+              <td colSpan={8} className="px-4 py-10 text-center text-gray-400">
+                {filterSite
+                  ? 'No employees for this site. Change the filter or use "Add Employee" above.'
+                  : 'No employees yet. Use "Add Employee" above to build the roster — new payroll sheets can then be prefilled automatically.'}
+              </td>
+            </tr>
           ) : filtered.map(e => {
             const site = e.site as { name: string; service_type: string } | undefined
             return (
@@ -152,7 +170,7 @@ export function EmployeeManager({ employees: initial, sites }: { employees: Empl
                     <button onClick={() => handleToggleActive(e)} className="text-gray-400 hover:text-amber-600 p-1 rounded" title={e.active ? 'Deactivate' : 'Activate'}>
                       {e.active ? <UserX className="h-3.5 w-3.5" /> : <UserCheck className="h-3.5 w-3.5" />}
                     </button>
-                    <button onClick={() => handleDelete(e)} className="text-gray-400 hover:text-red-600 p-1 rounded" title="Delete">
+                    <button onClick={() => setDeleteTarget(e)} className="text-gray-400 hover:text-red-600 p-1 rounded" title="Delete" aria-label={`Delete ${e.name}`}>
                       <Trash2 className="h-3.5 w-3.5" />
                     </button>
                   </div>
@@ -162,6 +180,15 @@ export function EmployeeManager({ employees: initial, sites }: { employees: Empl
           })}
         </tbody>
       </table>
+
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        title="Delete Employee"
+        message={<>Delete <strong dir="rtl">{deleteTarget?.name}</strong> from the roster? This cannot be undone. If they simply left, consider deactivating them instead so past payroll stays linked.</>}
+        loading={deleting}
+        onConfirm={() => deleteTarget && handleDelete(deleteTarget)}
+        onClose={() => setDeleteTarget(null)}
+      />
 
       <Modal open={open} onClose={() => setOpen(false)} title={editing ? 'Edit Employee' : 'Add Employee'} size="md">
         <div className="space-y-4">

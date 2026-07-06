@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Modal } from '@/components/ui/modal'
+import { useToast } from '@/components/ui/toast'
 import { Plus, Pencil, ToggleLeft, ToggleRight } from 'lucide-react'
 import type { Site, ServiceType } from '@/types'
 
@@ -27,6 +28,7 @@ export function SiteManager({ sites: initial }: { sites: Site[] }) {
   const [form, setForm] = useState<FormData>(emptyForm())
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const toast = useToast()
 
   function openNew() { setEditing(null); setForm(emptyForm()); setError(''); setOpen(true) }
   function openEdit(s: Site) { setEditing(s); setForm(siteToForm(s)); setError(''); setOpen(true) }
@@ -51,13 +53,16 @@ export function SiteManager({ sites: initial }: { sites: Site[] }) {
     }
     if (result.error) { setError(result.error.message); setSaving(false); return }
     setSites(editing ? sites.map(s => s.id === editing.id ? result.data : s) : [...sites, result.data])
+    toast(editing ? `Updated ${payload.name}` : `Added site ${payload.name}`)
     setSaving(false); setOpen(false)
   }
 
   async function handleToggle(s: Site) {
     const supabase = createClient()
-    await supabase.from('sites').update({ active: !s.active }).eq('id', s.id)
+    const { error: err } = await supabase.from('sites').update({ active: !s.active }).eq('id', s.id)
+    if (err) { toast(`Could not update ${s.name}: ${err.message}`, 'error'); return }
     setSites(prev => prev.map(x => x.id === s.id ? { ...x, active: !x.active } : x))
+    toast(s.active ? `${s.name} deactivated — it will be hidden from new sheets and filters` : `${s.name} activated`)
   }
 
   return (

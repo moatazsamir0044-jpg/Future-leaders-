@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Modal } from '@/components/ui/modal'
+import { useToast } from '@/components/ui/toast'
 import { Pencil } from 'lucide-react'
 import type { UserProfile, UserRole } from '@/types'
 
@@ -14,6 +15,7 @@ export function UserManager({ profiles: initial }: { profiles: UserProfile[] }) 
   const [form, setForm] = useState({ full_name: '', role: 'finance' as UserRole })
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const toast = useToast()
 
   function openEdit(p: UserProfile) {
     setEditing(p)
@@ -33,6 +35,7 @@ export function UserManager({ profiles: initial }: { profiles: UserProfile[] }) 
       .eq('id', editing.id)
     if (err) { setError(err.message); setSaving(false); return }
     setProfiles(prev => prev.map(p => p.id === editing.id ? { ...p, full_name: form.full_name.trim(), role: form.role } : p))
+    toast(`Updated ${form.full_name.trim()} (${form.role})`)
     setSaving(false); setOpen(false)
   }
 

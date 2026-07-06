@@ -79,7 +79,8 @@ export default async function ExpensesPage({ searchParams }: { searchParams: Pro
                   <tr>
                     <td colSpan={9} className="px-5 py-12 text-center text-gray-400">
                       <Receipt className="h-8 w-8 mx-auto mb-2 opacity-40" />
-                      No expense reports yet. Create one to get started.
+                      <p className="font-medium text-gray-500">No expense reports for {formatMonthYear(month, year)}</p>
+                      <p className="text-sm mt-1">Use &quot;New Expense Report&quot; above to create one, or switch to another month with the filter.</p>
                     </td>
                   </tr>
                 ) : (reports ?? []).map(r => {

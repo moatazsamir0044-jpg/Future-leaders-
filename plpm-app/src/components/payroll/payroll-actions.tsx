@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Modal } from '@/components/ui/modal'
+import { useToast } from '@/components/ui/toast'
 import { exportPayrollToExcel } from '@/lib/export/excel'
 import { exportPayrollToPDF } from '@/lib/export/pdf'
 import { FileSpreadsheet, FileText, Send, CheckCircle, XCircle, RotateCcw } from 'lucide-react'
@@ -17,8 +18,16 @@ interface Props {
   role: string
 }
 
+const STATUS_TOAST: Record<string, string> = {
+  submitted: 'Payroll submitted for approval',
+  approved: 'Payroll approved',
+  rejected: 'Payroll rejected',
+  draft: 'Payroll reset to draft — it can be edited again',
+}
+
 export function PayrollActions({ period, records, site, role }: Props) {
   const router = useRouter()
+  const toast = useToast()
   const [loading, setLoading] = useState<string | null>(null)
   const [rejectOpen, setRejectOpen] = useState(false)
   const [rejectionNotes, setRejectionNotes] = useState('')
@@ -61,9 +70,11 @@ export function PayrollActions({ period, records, site, role }: Props) {
 
     if (err) {
       setActionError(`Could not update status: ${err.message}`)
+      toast('Status update failed', 'error')
       setLoading(null)
       return
     }
+    toast(STATUS_TOAST[newStatus] ?? 'Status updated')
 
     if (user) {
       await supabase.from('approval_logs').insert({

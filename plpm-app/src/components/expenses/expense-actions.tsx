@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Modal } from '@/components/ui/modal'
+import { useToast } from '@/components/ui/toast'
 import { exportExpenseToExcel } from '@/lib/export/excel'
 import { exportExpenseToPDF } from '@/lib/export/pdf'
 import { FileSpreadsheet, FileText, Send, CheckCircle, XCircle, RotateCcw } from 'lucide-react'
@@ -19,8 +20,16 @@ interface Props {
   role: string
 }
 
+const STATUS_TOAST: Record<string, string> = {
+  submitted: 'Expense report submitted for approval',
+  approved: 'Expense report approved',
+  rejected: 'Expense report rejected',
+  draft: 'Expense report reset to draft — it can be edited again',
+}
+
 export function ExpenseActions({ report, transportation, accommodation, items, site, role }: Props) {
   const router = useRouter()
+  const toast = useToast()
   const [loading, setLoading] = useState<string | null>(null)
   const [rejectOpen, setRejectOpen] = useState(false)
   const [rejectionNotes, setRejectionNotes] = useState('')
@@ -60,9 +69,11 @@ export function ExpenseActions({ report, transportation, accommodation, items, s
     const { error: err } = await supabase.from('expense_reports').update(updates).eq('id', report.id)
     if (err) {
       setActionError(`Could not update status: ${err.message}`)
+      toast('Status update failed', 'error')
       setLoading(null)
       return
     }
+    toast(STATUS_TOAST[newStatus] ?? 'Status updated')
 
     if (user) {
       await supabase.from('approval_logs').insert({
