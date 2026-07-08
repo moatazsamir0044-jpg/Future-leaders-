@@ -8,18 +8,22 @@ import { DashboardFilters } from '@/components/dashboard/filters'
 import { NewPayrollButton } from '@/components/payroll/new-payroll-button'
 import { FileText } from 'lucide-react'
 
-interface SearchParams { month?: string; year?: string; site?: string }
+interface SearchParams { month?: string; year?: string; type?: string }
 
 export default async function PayrollPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const params = await searchParams
   const supabase = await createClient()
   const { month, year } = await resolvePeriod(supabase, params)
+  const type = params.type
 
   const [{ data: periods }, { data: sites }] = await Promise.all([
-    supabase.from('payroll_periods')
-      .select('*, site:sites(id, name, name_ar, service_type, client_name)')
-      .eq('month', month).eq('year', year)
-      .order('created_at', { ascending: false }),
+    (() => {
+      let q = supabase.from('payroll_periods')
+        .select('*, site:sites!inner(id, name, name_ar, service_type, client_name)')
+        .eq('month', month).eq('year', year)
+      if (type) q = q.eq('site.service_type', type)
+      return q.order('created_at', { ascending: false })
+    })(),
     supabase.from('sites').select('*').eq('active', true).order('sort_order'),
   ])
 
@@ -33,7 +37,7 @@ export default async function PayrollPage({ searchParams }: { searchParams: Prom
           <p className="text-sm text-gray-500 mt-0.5">{formatMonthYear(month, year)}</p>
         </div>
         <div className="flex items-center gap-3">
-          <DashboardFilters currentMonth={month} currentYear={year} />
+          <DashboardFilters currentMonth={month} currentYear={year} currentType={type ?? 'all'} />
           <NewPayrollButton sites={sites ?? []} month={month} year={year} />
         </div>
       </div>

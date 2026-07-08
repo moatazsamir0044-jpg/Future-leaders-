@@ -10,13 +10,14 @@ import { DashboardCharts } from '@/components/dashboard/charts'
 import { DashboardFilters } from '@/components/dashboard/filters'
 import { FileText, Receipt, CheckSquare, AlertCircle, TrendingUp, Building2 } from 'lucide-react'
 
-interface SearchParams { month?: string; year?: string; site?: string; status?: string }
+interface SearchParams { month?: string; year?: string; type?: string; status?: string }
 
 export default async function DashboardPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const params = await searchParams
   const supabase = await createClient()
 
   const { month, year } = await resolvePeriod(supabase, params)
+  const type = params.type
 
   // Fetch all data in parallel
   const [
@@ -27,14 +28,20 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
     { data: pendingExpenses },
   ] = await Promise.all([
     supabase.from('sites').select('*').eq('active', true).order('sort_order'),
-    supabase.from('payroll_periods')
-      .select('*, site:sites(name, service_type)')
-      .eq('month', month).eq('year', year)
-      .order('created_at', { ascending: false }),
-    supabase.from('expense_reports')
-      .select('*, site:sites(name, service_type)')
-      .eq('month', month).eq('year', year)
-      .order('created_at', { ascending: false }),
+    (() => {
+      let q = supabase.from('payroll_periods')
+        .select('*, site:sites!inner(name, service_type)')
+        .eq('month', month).eq('year', year)
+      if (type) q = q.eq('site.service_type', type)
+      return q.order('created_at', { ascending: false })
+    })(),
+    (() => {
+      let q = supabase.from('expense_reports')
+        .select('*, site:sites!inner(name, service_type)')
+        .eq('month', month).eq('year', year)
+      if (type) q = q.eq('site.service_type', type)
+      return q.order('created_at', { ascending: false })
+    })(),
     supabase.from('payroll_periods').select('id').eq('status', 'submitted'),
     supabase.from('expense_reports').select('id').eq('status', 'submitted'),
   ])
@@ -52,7 +59,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
           <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
           <p className="text-sm text-gray-500 mt-0.5">{formatMonthYear(month, year)} overview</p>
         </div>
-        <DashboardFilters currentMonth={month} currentYear={year} />
+        <DashboardFilters currentMonth={month} currentYear={year} currentType={type ?? 'all'} />
       </div>
 
       {/* KPI cards */}
