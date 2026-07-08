@@ -8,9 +8,9 @@ import { StatusBadge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { DashboardCharts } from '@/components/dashboard/charts'
 import { DashboardFilters } from '@/components/dashboard/filters'
-import { FileText, Receipt, CheckSquare, AlertCircle, TrendingUp, Building2 } from 'lucide-react'
+import { FileText, Receipt, CheckSquare, TrendingUp } from 'lucide-react'
 
-interface SearchParams { month?: string; year?: string; type?: string; status?: string }
+interface SearchParams { month?: string; year?: string; type?: string; site?: string; status?: string }
 
 export default async function DashboardPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const params = await searchParams
@@ -18,6 +18,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
 
   const { month, year } = await resolvePeriod(supabase, params)
   const type = params.type
+  const site = params.site
 
   // Fetch all data in parallel
   const [
@@ -33,6 +34,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
         .select('*, site:sites!inner(name, service_type)')
         .eq('month', month).eq('year', year)
       if (type) q = q.eq('site.service_type', type)
+      if (site) q = q.eq('site_id', site)
       return q.order('created_at', { ascending: false })
     })(),
     (() => {
@@ -40,6 +42,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
         .select('*, site:sites!inner(name, service_type)')
         .eq('month', month).eq('year', year)
       if (type) q = q.eq('site.service_type', type)
+      if (site) q = q.eq('site_id', site)
       return q.order('created_at', { ascending: false })
     })(),
     supabase.from('payroll_periods').select('id').eq('status', 'submitted'),
@@ -59,7 +62,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
           <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
           <p className="text-sm text-gray-500 mt-0.5">{formatMonthYear(month, year)} overview</p>
         </div>
-        <DashboardFilters currentMonth={month} currentYear={year} currentType={type ?? 'all'} />
+        <DashboardFilters currentMonth={month} currentYear={year} currentType={type ?? 'all'} sites={sites ?? []} currentSite={site} />
       </div>
 
       {/* KPI cards */}

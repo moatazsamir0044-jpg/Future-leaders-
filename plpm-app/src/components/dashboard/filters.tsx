@@ -6,14 +6,20 @@ import { useCallback } from 'react'
 
 const SERVICE_TYPES = Object.keys(SERVICE_TYPE_LABELS) as ServiceType[]
 
+interface SiteOption { id: string; name: string }
+
 export function DashboardFilters({
   currentMonth,
   currentYear,
   currentType,
+  sites,
+  currentSite,
 }: {
   currentMonth: number
   currentYear: number
   currentType?: string
+  sites?: SiteOption[]
+  currentSite?: string
 }) {
   const router = useRouter()
   const pathname = usePathname()
@@ -61,6 +67,19 @@ export function DashboardFilters({
           <option value="all">All Types</option>
           {SERVICE_TYPES.map(t => (
             <option key={t} value={t}>{SERVICE_TYPE_LABELS[t]} ({t.toUpperCase()})</option>
+          ))}
+        </select>
+      )}
+      {sites !== undefined && (
+        <select
+          value={currentSite ?? 'all'}
+          onChange={e => update('site', e.target.value)}
+          aria-label="Site"
+          className="h-9 max-w-[200px] rounded-lg border border-gray-200 bg-white px-3 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+        >
+          <option value="all">All Sites</option>
+          {sites.map(s => (
+            <option key={s.id} value={s.id}>{s.name}</option>
           ))}
         </select>
       )}

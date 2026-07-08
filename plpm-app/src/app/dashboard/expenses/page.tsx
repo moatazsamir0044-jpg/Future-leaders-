@@ -8,13 +8,14 @@ import { DashboardFilters } from '@/components/dashboard/filters'
 import { NewExpenseButton } from '@/components/expenses/new-expense-button'
 import { Receipt } from 'lucide-react'
 
-interface SearchParams { month?: string; year?: string; type?: string }
+interface SearchParams { month?: string; year?: string; type?: string; site?: string }
 
 export default async function ExpensesPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const params = await searchParams
   const supabase = await createClient()
   const { month, year } = await resolvePeriod(supabase, params)
   const type = params.type
+  const site = params.site
 
   const [{ data: reports }, { data: sites }] = await Promise.all([
     (() => {
@@ -22,6 +23,7 @@ export default async function ExpensesPage({ searchParams }: { searchParams: Pro
         .select('*, site:sites!inner(id, name, service_type, client_name)')
         .eq('month', month).eq('year', year)
       if (type) q = q.eq('site.service_type', type)
+      if (site) q = q.eq('site_id', site)
       return q.order('created_at', { ascending: false })
     })(),
     supabase.from('sites').select('*').eq('active', true).order('sort_order'),
@@ -37,7 +39,7 @@ export default async function ExpensesPage({ searchParams }: { searchParams: Pro
           <p className="text-sm text-gray-500 mt-0.5">{formatMonthYear(month, year)}</p>
         </div>
         <div className="flex items-center gap-3">
-          <DashboardFilters currentMonth={month} currentYear={year} currentType={type ?? 'all'} />
+          <DashboardFilters currentMonth={month} currentYear={year} currentType={type ?? 'all'} sites={sites ?? []} currentSite={site} />
           <NewExpenseButton sites={sites ?? []} month={month} year={year} />
         </div>
       </div>
