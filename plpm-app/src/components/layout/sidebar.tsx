@@ -5,7 +5,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import { cn } from '@/lib/utils'
 import {
-  LayoutDashboard, Users, FileText, Receipt,
+  LayoutDashboard, Users, FileText, Receipt, Banknote, ScrollText, Briefcase,
   CheckSquare, Settings, LogOut, Building2, Menu, X
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
@@ -14,6 +14,9 @@ const nav = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/dashboard/payroll', label: 'Payroll', icon: FileText },
   { href: '/dashboard/expenses', label: 'Expenses', icon: Receipt },
+  { href: '/dashboard/invoices', label: 'Invoices', icon: ScrollText },
+  { href: '/dashboard/finance', label: 'Receivables', icon: Banknote },
+  { href: '/dashboard/clients', label: 'Clients & Contracts', icon: Briefcase },
   { href: '/dashboard/employees', label: 'Employees', icon: Users },
   { href: '/dashboard/approvals', label: 'Approvals', icon: CheckSquare },
   { href: '/dashboard/settings', label: 'Settings', icon: Settings },

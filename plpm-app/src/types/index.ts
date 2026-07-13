@@ -134,6 +134,68 @@ export interface ExpenseItem {
   sort_order: number
 }
 
+export type InvoiceStatus = 'draft' | 'agreed' | 'sent_to_accountant' | 'issued' | 'sent_to_client' | 'collected'
+export type CollectionMethod = 'transfer' | 'cheque' | 'cash'
+export type DeductionReason = 'headcount_shortfall' | 'evaluation' | 'conduct' | 'damages' | 'other'
+
+export interface Client {
+  id: string
+  name: string
+  name_ar: string | null
+  active: boolean
+  notes: string | null
+  created_at: string
+}
+
+export interface Contract {
+  id: string
+  client_id: string
+  name: string
+  monthly_value: number
+  payment_terms_days: number
+  escalation_percent: number | null
+  escalation_month: number | null
+  start_date: string | null
+  end_date: string | null
+  active: boolean
+  notes: string | null
+  created_at: string
+  client?: Client
+  contract_sites?: { site_id: string; site?: Site }[]
+}
+
+export interface Invoice {
+  id: string
+  contract_id: string
+  month: number
+  year: number
+  is_extra_works: boolean
+  gross_amount: number
+  total_deductions: number
+  net_amount: number
+  withholding_amount: number
+  credit_note_amount: number
+  credit_note_reason: string | null
+  status: InvoiceStatus
+  eta_reference: string | null
+  issue_date: string | null
+  due_date: string | null
+  collected_date: string | null
+  collection_method: CollectionMethod | null
+  notes: string | null
+  created_at: string
+  contract?: Contract
+}
+
+export interface InvoiceDeduction {
+  id: string
+  invoice_id: string
+  reason: DeductionReason
+  description: string | null
+  amount: number
+  sort_order: number
+}
+
 export interface ApprovalLog {
   id: string
   entity_type: EntityType
@@ -174,4 +236,43 @@ export const STATUS_COLORS: Record<Status, string> = {
   submitted: 'bg-blue-100 text-blue-700',
   approved: 'bg-green-100 text-green-700',
   rejected: 'bg-red-100 text-red-700',
+}
+
+// Mirrors the real cycle: Excel draft → deductions agreed in the monthly
+// client meeting → sent to the external accountant → issued on the ETA
+// portal → PDF emailed to the client → collected (always in full).
+export const INVOICE_STATUS_FLOW: InvoiceStatus[] = [
+  'draft', 'agreed', 'sent_to_accountant', 'issued', 'sent_to_client', 'collected',
+]
+
+export const INVOICE_STATUS_LABELS: Record<InvoiceStatus, string> = {
+  draft: 'Draft',
+  agreed: 'Agreed with client',
+  sent_to_accountant: 'Sent to accountant',
+  issued: 'Issued on ETA',
+  sent_to_client: 'Sent to client',
+  collected: 'Collected',
+}
+
+export const INVOICE_STATUS_LABELS_AR: Record<InvoiceStatus, string> = {
+  draft: 'مسودة',
+  agreed: 'متفق عليها مع العميل',
+  sent_to_accountant: 'أُرسلت للمحاسب',
+  issued: 'صدرت على المنظومة',
+  sent_to_client: 'أُرسلت للعميل',
+  collected: 'تم التحصيل',
+}
+
+export const DEDUCTION_REASON_LABELS: Record<DeductionReason, string> = {
+  headcount_shortfall: 'Headcount shortfall — نقص أعداد',
+  evaluation: 'Performance evaluation — تقييم',
+  conduct: 'Conduct violation — سلوك',
+  damages: 'Damages — تلفيات',
+  other: 'Other — أخرى',
+}
+
+export const COLLECTION_METHOD_LABELS: Record<CollectionMethod, string> = {
+  transfer: 'Bank transfer',
+  cheque: 'Cheque',
+  cash: 'Cash',
 }

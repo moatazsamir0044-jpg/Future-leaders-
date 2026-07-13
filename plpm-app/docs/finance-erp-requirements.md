@@ -113,7 +113,10 @@ into a finance system.
 
 ## 3. Proposed build plan (phased)
 
-### Phase 1 — Contracts, invoicing & AR aging *(highest value)*
+### Phase 1 — Contracts, invoicing & AR aging *(highest value)* — ✅ BUILT
+Implemented in `supabase/migrations/20260713000001_finance_phase1_contracts_invoicing.sql`
+plus the Clients & Contracts, Invoices, and Receivables & Profit screens.
+
 The cash gap (30-day terms vs. 2–6 month reality) tracked in Excel is the
 single biggest finance risk. Build:
 - **Client & contract registry**: client entity, sites covered, contract value,
