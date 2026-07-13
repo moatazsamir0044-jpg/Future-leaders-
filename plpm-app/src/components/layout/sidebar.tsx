@@ -6,12 +6,14 @@ import { useEffect, useState } from 'react'
 import { cn } from '@/lib/utils'
 import {
   LayoutDashboard, Users, FileText, Receipt, Banknote, ScrollText, Briefcase,
-  HandCoins, Wallet, CheckSquare, Settings, LogOut, Building2, Menu, X
+  HandCoins, Wallet, Sunrise, FileSpreadsheet, CheckSquare, Settings, LogOut,
+  Building2, Menu, X
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 
 const nav = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  { href: '/dashboard/morning', label: 'Morning Report', icon: Sunrise },
   { href: '/dashboard/payroll', label: 'Payroll', icon: FileText },
   { href: '/dashboard/expenses', label: 'Expenses', icon: Receipt },
   { href: '/dashboard/invoices', label: 'Invoices', icon: ScrollText },
@@ -19,6 +21,7 @@ const nav = [
   { href: '/dashboard/clients', label: 'Clients & Contracts', icon: Briefcase },
   { href: '/dashboard/advances', label: 'Advances', icon: HandCoins },
   { href: '/dashboard/custody', label: 'Custody', icon: Wallet },
+  { href: '/dashboard/exports', label: 'Accountant Export', icon: FileSpreadsheet },
   { href: '/dashboard/employees', label: 'Employees', icon: Users },
   { href: '/dashboard/approvals', label: 'Approvals', icon: CheckSquare },
   { href: '/dashboard/settings', label: 'Settings', icon: Settings },

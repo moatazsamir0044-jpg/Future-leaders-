@@ -249,6 +249,19 @@ export interface CustodyTransaction {
   account?: CustodyAccount
 }
 
+export interface SiteBudget {
+  id: string
+  site_id: string
+  month: number
+  year: number
+  planned_headcount: number
+  budget_payroll: number
+  budget_expenses: number
+  notes: string | null
+  created_at: string
+  site?: Site
+}
+
 export interface ApprovalLog {
   id: string
   entity_type: EntityType

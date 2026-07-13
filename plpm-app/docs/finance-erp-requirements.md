@@ -144,16 +144,22 @@ deductions as repayments (reset-to-draft reverts them).
 - **Custody (عهدة) tracking**: InstaPay float and vehicle costs, with monthly
   reconciliation; cash receipt voucher log for contractor/driver/landlord payments.
 
-### Phase 3 — Morning dashboard & budget vs. actual
+### Phase 3 — Morning dashboard & budget vs. actual — ✅ BUILT
+Implemented in `supabase/migrations/20260713000003_finance_phase3_site_budgets.sql`
+plus the Arabic Morning Report screen (headcount vs plan, shortfall flags,
+budget vs actual per site, per-site monthly budgets with copy-forward).
+
 - Arabic dashboard answering the three morning questions: site headcount today,
   shortfall flags, budget vs. actual (headcount + expenses) per site.
 - **Budget per site** module (monthly plan values) feeding the comparison.
 
-### Phase 4 — Accountant export pack & roles
-- One-click monthly export for the Alexandria office: invoices issued,
-  collections, payroll totals, expenses, withholding suffered, social insurance —
-  replacing the WhatsApp/Excel handoff.
-- Refine the role/permission matrix once real usage patterns are known.
+### Phase 4 — Accountant export pack & roles — ✅ BUILT (export)
+- One-click monthly export for the Alexandria office implemented on the
+  Accountant Export screen: one Arabic RTL workbook with summary, invoices,
+  collections, payroll (incl. insurance & advance deductions per site),
+  expenses, advance repayments, and custody movements.
+- Role/permission matrix intentionally deferred — per management's answer,
+  users and permissions will be defined after rollout.
 
 ---
 
