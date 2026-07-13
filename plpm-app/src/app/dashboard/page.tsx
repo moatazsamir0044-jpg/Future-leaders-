@@ -10,19 +10,21 @@ import { DashboardCharts } from '@/components/dashboard/charts'
 import { DashboardFilters } from '@/components/dashboard/filters'
 import { FileText, Receipt, CheckSquare, AlertCircle, TrendingUp, Building2 } from 'lucide-react'
 
-interface SearchParams { month?: string; year?: string; site?: string; status?: string }
+interface SearchParams { month?: string; year?: string; site?: string; type?: string; status?: string }
 
 export default async function DashboardPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const params = await searchParams
   const supabase = await createClient()
 
   const { month, year } = await resolvePeriod(supabase, params)
+  const siteFilter = params.site || null
+  const typeFilter = params.type || null
 
   // Fetch all data in parallel
   const [
     { data: sites },
-    { data: payrollPeriods },
-    { data: expenseReports },
+    { data: allPayrollPeriods },
+    { data: allExpenseReports },
     { data: pendingPayroll },
     { data: pendingExpenses },
   ] = await Promise.all([
@@ -39,6 +41,15 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
     supabase.from('expense_reports').select('id').eq('status', 'submitted'),
   ])
 
+  const bySiteFilter = (row: { site_id: string; site: unknown }) => {
+    const site = row.site as { service_type?: string } | null
+    if (siteFilter && row.site_id !== siteFilter) return false
+    if (typeFilter && site?.service_type !== typeFilter) return false
+    return true
+  }
+  const payrollPeriods = (allPayrollPeriods ?? []).filter(bySiteFilter)
+  const expenseReports = (allExpenseReports ?? []).filter(bySiteFilter)
+
   const totalPayroll = (payrollPeriods ?? []).reduce((s, p) => s + Number(p.total_net ?? 0), 0)
   const totalExpenses = (expenseReports ?? []).reduce((s, e) => s + Number(e.grand_total ?? 0), 0)
   const approvedPayroll = (payrollPeriods ?? []).filter(p => p.status === 'approved').length
@@ -52,7 +63,8 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
           <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
           <p className="text-sm text-gray-500 mt-0.5">{formatMonthYear(month, year)} overview</p>
         </div>
-        <DashboardFilters currentMonth={month} currentYear={year} />
+        <DashboardFilters currentMonth={month} currentYear={year}
+          sites={sites ?? []} currentSite={siteFilter ?? undefined} currentType={typeFilter ?? undefined} />
       </div>
 
       {/* KPI cards */}

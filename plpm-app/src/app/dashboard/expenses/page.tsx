@@ -8,20 +8,29 @@ import { DashboardFilters } from '@/components/dashboard/filters'
 import { NewExpenseButton } from '@/components/expenses/new-expense-button'
 import { Receipt } from 'lucide-react'
 
-interface SearchParams { month?: string; year?: string }
+interface SearchParams { month?: string; year?: string; site?: string; type?: string }
 
 export default async function ExpensesPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const params = await searchParams
   const supabase = await createClient()
   const { month, year } = await resolvePeriod(supabase, params)
+  const siteFilter = params.site || null
+  const typeFilter = params.type || null
 
-  const [{ data: reports }, { data: sites }] = await Promise.all([
+  const [{ data: allReports }, { data: sites }] = await Promise.all([
     supabase.from('expense_reports')
       .select('*, site:sites(id, name, service_type, client_name)')
       .eq('month', month).eq('year', year)
       .order('created_at', { ascending: false }),
     supabase.from('sites').select('*').eq('active', true).order('sort_order'),
   ])
+
+  const reports = (allReports ?? []).filter(r => {
+    const site = r.site as { service_type?: string } | null
+    if (siteFilter && r.site_id !== siteFilter) return false
+    if (typeFilter && site?.service_type !== typeFilter) return false
+    return true
+  })
 
   const grandTotal = (reports ?? []).reduce((s, r) => s + Number(r.grand_total ?? 0), 0)
 
@@ -33,7 +42,8 @@ export default async function ExpensesPage({ searchParams }: { searchParams: Pro
           <p className="text-sm text-gray-500 mt-0.5">{formatMonthYear(month, year)}</p>
         </div>
         <div className="flex items-center gap-3">
-          <DashboardFilters currentMonth={month} currentYear={year} />
+          <DashboardFilters currentMonth={month} currentYear={year}
+            sites={sites ?? []} currentSite={siteFilter ?? undefined} currentType={typeFilter ?? undefined} />
           <NewExpenseButton sites={sites ?? []} month={month} year={year} />
         </div>
       </div>

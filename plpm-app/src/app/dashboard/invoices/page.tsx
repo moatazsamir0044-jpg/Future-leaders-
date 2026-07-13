@@ -9,25 +9,34 @@ import { InvoiceStatusBadge } from '@/components/finance/invoice-status-badge'
 import { ScrollText } from 'lucide-react'
 import type { Invoice, Contract } from '@/types'
 
-interface SearchParams { month?: string; year?: string }
+interface SearchParams { month?: string; year?: string; site?: string; type?: string }
 
 export default async function InvoicesPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const params = await searchParams
   const supabase = await createClient()
   const { month, year } = await resolvePeriod(supabase, params)
+  const siteFilter = params.site || null
+  const typeFilter = params.type || null
 
-  const [{ data: invoices }, { data: contracts }] = await Promise.all([
+  const [{ data: invoices }, { data: contracts }, { data: sites }] = await Promise.all([
     supabase.from('invoices')
-      .select('*, contract:contracts(id, name, monthly_value, client:clients(id, name))')
+      .select('*, contract:contracts(id, name, monthly_value, client:clients(id, name), contract_sites(site_id, site:sites(id, service_type)))')
       .eq('month', month).eq('year', year)
       .order('created_at', { ascending: false }),
     supabase.from('contracts')
       .select('*, client:clients(id, name)')
       .eq('active', true)
       .order('name'),
+    supabase.from('sites').select('*').eq('active', true).order('sort_order'),
   ])
 
-  const list = (invoices ?? []) as Invoice[]
+  // An invoice matches when its contract covers the selected site / type
+  const list = ((invoices ?? []) as Invoice[]).filter(inv => {
+    const links = inv.contract?.contract_sites ?? []
+    if (siteFilter && !links.some(cs => cs.site_id === siteFilter)) return false
+    if (typeFilter && !links.some(cs => cs.site?.service_type === typeFilter)) return false
+    return true
+  })
   const totalNet = list.reduce((s, i) => s + Number(i.net_amount ?? 0), 0)
   const collected = list.filter(i => i.status === 'collected')
     .reduce((s, i) => s + Number(i.net_amount ?? 0), 0)
@@ -41,9 +50,10 @@ export default async function InvoicesPage({ searchParams }: { searchParams: Pro
           <p className="text-sm text-gray-500 mt-0.5">{formatMonthYear(month, year)} — one invoice per contract</p>
         </div>
         <div className="flex items-center gap-3">
-          <DashboardFilters currentMonth={month} currentYear={year} />
+          <DashboardFilters currentMonth={month} currentYear={year}
+            sites={sites ?? []} currentSite={siteFilter ?? undefined} currentType={typeFilter ?? undefined} />
           <NewInvoiceButton contracts={(contracts ?? []) as Contract[]} month={month} year={year}
-            existingContractIds={list.filter(i => !i.is_extra_works).map(i => i.contract_id)} />
+            existingContractIds={((invoices ?? []) as Invoice[]).filter(i => !i.is_extra_works).map(i => i.contract_id)} />
         </div>
       </div>
 
