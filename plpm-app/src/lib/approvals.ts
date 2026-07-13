@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/client'
+import { applyPayrollAdvanceRepayments, revertPayrollAdvanceRepayments } from '@/lib/advances'
 
 export type ApprovalEntity = 'payroll' | 'expense'
 export type WorkflowStatus = 'draft' | 'submitted' | 'approved' | 'rejected'
@@ -44,6 +45,21 @@ export async function updateApprovalStatus(
 
   const { error } = await supabase.from(TABLES[entity]).update(updates).eq('id', id)
   if (error) return error.message
+
+  // Keep the advance ledger in sync with payroll approvals: approving a
+  // sheet records its advance deductions as repayments; resetting to draft
+  // reverts them. The status change above stands either way — a ledger
+  // error is surfaced but doesn't block the workflow.
+  if (entity === 'payroll') {
+    if (newStatus === 'approved') {
+      const ledgerErr = await applyPayrollAdvanceRepayments(id)
+      if (ledgerErr) return `Approved, but advance repayments could not be recorded: ${ledgerErr}`
+    }
+    if (newStatus === 'draft') {
+      const ledgerErr = await revertPayrollAdvanceRepayments(id)
+      if (ledgerErr) return `Reset to draft, but advance repayments could not be reverted: ${ledgerErr}`
+    }
+  }
 
   if (user) {
     await supabase.from('approval_logs').insert({

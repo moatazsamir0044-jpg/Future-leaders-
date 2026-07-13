@@ -132,7 +132,12 @@ single biggest finance risk. Build:
 - **Profit per site**: contract net revenue vs. the payroll + expense costs the
   system already knows.
 
-### Phase 2 — Advances ledger & cash custody
+### Phase 2 — Advances ledger & cash custody — ✅ BUILT
+Implemented in `supabase/migrations/20260713000002_finance_phase2_advances_custody.sql`
+plus the Advances and Custody screens. Payroll integration: roster prefill
+fills the advance column from the ledger; approving a sheet records the
+deductions as repayments (reset-to-draft reverts them).
+
 - **Worker advance ledger**: holiday advances (full recovery) and long-term
   installment advances; balance per worker across months; auto-deduction line
   feeding the existing payroll sheets.

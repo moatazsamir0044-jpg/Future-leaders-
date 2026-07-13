@@ -196,6 +196,59 @@ export interface InvoiceDeduction {
   sort_order: number
 }
 
+export type AdvanceType = 'holiday' | 'long_term'
+export type AdvanceStatus = 'active' | 'settled' | 'cancelled'
+export type RepaymentSource = 'payroll' | 'cash'
+export type CustodyTxnType = 'top_up' | 'expense'
+
+export interface WorkerAdvance {
+  id: string
+  employee_id: string
+  advance_type: AdvanceType
+  amount: number
+  monthly_installment: number
+  advance_date: string
+  status: AdvanceStatus
+  notes: string | null
+  created_at: string
+  employee?: Employee
+  repayments?: AdvanceRepayment[]
+}
+
+export interface AdvanceRepayment {
+  id: string
+  advance_id: string
+  payroll_period_id: string | null
+  month: number
+  year: number
+  amount: number
+  source: RepaymentSource
+  notes: string | null
+  created_at: string
+}
+
+export interface CustodyAccount {
+  id: string
+  name: string
+  name_ar: string | null
+  holder: string | null
+  active: boolean
+  notes: string | null
+  created_at: string
+}
+
+export interface CustodyTransaction {
+  id: string
+  account_id: string
+  txn_date: string
+  type: CustodyTxnType
+  amount: number
+  payee: string | null
+  description: string | null
+  created_at: string
+  account?: CustodyAccount
+}
+
 export interface ApprovalLog {
   id: string
   entity_type: EntityType
@@ -275,4 +328,20 @@ export const COLLECTION_METHOD_LABELS: Record<CollectionMethod, string> = {
   transfer: 'Bank transfer',
   cheque: 'Cheque',
   cash: 'Cash',
+}
+
+export const ADVANCE_TYPE_LABELS: Record<AdvanceType, string> = {
+  holiday: 'Holiday — سلفة عيد',
+  long_term: 'Long-term — طويلة الأجل',
+}
+
+export const ADVANCE_STATUS_LABELS: Record<AdvanceStatus, string> = {
+  active: 'Active',
+  settled: 'Settled',
+  cancelled: 'Cancelled',
+}
+
+export const CUSTODY_TXN_LABELS: Record<CustodyTxnType, string> = {
+  top_up: 'Top-up — إيداع',
+  expense: 'Expense — مصروف',
 }
