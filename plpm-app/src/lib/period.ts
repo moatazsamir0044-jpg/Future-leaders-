@@ -27,7 +27,7 @@ export async function resolvePeriod(
   let month = now.getMonth() + 1
   let year = now.getFullYear()
 
-  const [{ data: latestPayroll }, { data: latestExpense }] = await Promise.all([
+  const [{ data: latestPayroll }, { data: latestExpense }, { data: latestInvoice }] = await Promise.all([
     supabase
       .from('payroll_periods')
       .select('month, year')
@@ -42,9 +42,16 @@ export async function resolvePeriod(
       .order('month', { ascending: false })
       .limit(1)
       .maybeSingle(),
+    supabase
+      .from('invoices')
+      .select('month, year')
+      .order('year', { ascending: false })
+      .order('month', { ascending: false })
+      .limit(1)
+      .maybeSingle(),
   ])
 
-  const candidates = [latestPayroll, latestExpense].filter(
+  const candidates = [latestPayroll, latestExpense, latestInvoice].filter(
     (c): c is { month: number; year: number } => c != null,
   )
   if (candidates.length > 0) {

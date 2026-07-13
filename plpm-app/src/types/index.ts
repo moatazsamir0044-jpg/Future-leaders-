@@ -134,6 +134,134 @@ export interface ExpenseItem {
   sort_order: number
 }
 
+export type InvoiceStatus = 'draft' | 'agreed' | 'sent_to_accountant' | 'issued' | 'sent_to_client' | 'collected'
+export type CollectionMethod = 'transfer' | 'cheque' | 'cash'
+export type DeductionReason = 'headcount_shortfall' | 'evaluation' | 'conduct' | 'damages' | 'other'
+
+export interface Client {
+  id: string
+  name: string
+  name_ar: string | null
+  active: boolean
+  notes: string | null
+  created_at: string
+}
+
+export interface Contract {
+  id: string
+  client_id: string
+  name: string
+  monthly_value: number
+  payment_terms_days: number
+  escalation_percent: number | null
+  escalation_month: number | null
+  start_date: string | null
+  end_date: string | null
+  active: boolean
+  notes: string | null
+  created_at: string
+  client?: Client
+  contract_sites?: { site_id: string; site?: Site }[]
+}
+
+export interface Invoice {
+  id: string
+  contract_id: string
+  month: number
+  year: number
+  is_extra_works: boolean
+  gross_amount: number
+  total_deductions: number
+  net_amount: number
+  withholding_amount: number
+  credit_note_amount: number
+  credit_note_reason: string | null
+  status: InvoiceStatus
+  eta_reference: string | null
+  issue_date: string | null
+  due_date: string | null
+  collected_date: string | null
+  collection_method: CollectionMethod | null
+  notes: string | null
+  created_at: string
+  contract?: Contract
+}
+
+export interface InvoiceDeduction {
+  id: string
+  invoice_id: string
+  reason: DeductionReason
+  description: string | null
+  amount: number
+  sort_order: number
+}
+
+export type AdvanceType = 'holiday' | 'long_term'
+export type AdvanceStatus = 'active' | 'settled' | 'cancelled'
+export type RepaymentSource = 'payroll' | 'cash'
+export type CustodyTxnType = 'top_up' | 'expense'
+
+export interface WorkerAdvance {
+  id: string
+  employee_id: string
+  advance_type: AdvanceType
+  amount: number
+  monthly_installment: number
+  advance_date: string
+  status: AdvanceStatus
+  notes: string | null
+  created_at: string
+  employee?: Employee
+  repayments?: AdvanceRepayment[]
+}
+
+export interface AdvanceRepayment {
+  id: string
+  advance_id: string
+  payroll_period_id: string | null
+  month: number
+  year: number
+  amount: number
+  source: RepaymentSource
+  notes: string | null
+  created_at: string
+}
+
+export interface CustodyAccount {
+  id: string
+  name: string
+  name_ar: string | null
+  holder: string | null
+  active: boolean
+  notes: string | null
+  created_at: string
+}
+
+export interface CustodyTransaction {
+  id: string
+  account_id: string
+  txn_date: string
+  type: CustodyTxnType
+  amount: number
+  payee: string | null
+  description: string | null
+  created_at: string
+  account?: CustodyAccount
+}
+
+export interface SiteBudget {
+  id: string
+  site_id: string
+  month: number
+  year: number
+  planned_headcount: number
+  budget_payroll: number
+  budget_expenses: number
+  notes: string | null
+  created_at: string
+  site?: Site
+}
+
 export interface ApprovalLog {
   id: string
   entity_type: EntityType
@@ -174,4 +302,59 @@ export const STATUS_COLORS: Record<Status, string> = {
   submitted: 'bg-blue-100 text-blue-700',
   approved: 'bg-green-100 text-green-700',
   rejected: 'bg-red-100 text-red-700',
+}
+
+// Mirrors the real cycle: Excel draft → deductions agreed in the monthly
+// client meeting → sent to the external accountant → issued on the ETA
+// portal → PDF emailed to the client → collected (always in full).
+export const INVOICE_STATUS_FLOW: InvoiceStatus[] = [
+  'draft', 'agreed', 'sent_to_accountant', 'issued', 'sent_to_client', 'collected',
+]
+
+export const INVOICE_STATUS_LABELS: Record<InvoiceStatus, string> = {
+  draft: 'Draft',
+  agreed: 'Agreed with client',
+  sent_to_accountant: 'Sent to accountant',
+  issued: 'Issued on ETA',
+  sent_to_client: 'Sent to client',
+  collected: 'Collected',
+}
+
+export const INVOICE_STATUS_LABELS_AR: Record<InvoiceStatus, string> = {
+  draft: 'مسودة',
+  agreed: 'متفق عليها مع العميل',
+  sent_to_accountant: 'أُرسلت للمحاسب',
+  issued: 'صدرت على المنظومة',
+  sent_to_client: 'أُرسلت للعميل',
+  collected: 'تم التحصيل',
+}
+
+export const DEDUCTION_REASON_LABELS: Record<DeductionReason, string> = {
+  headcount_shortfall: 'Headcount shortfall — نقص أعداد',
+  evaluation: 'Performance evaluation — تقييم',
+  conduct: 'Conduct violation — سلوك',
+  damages: 'Damages — تلفيات',
+  other: 'Other — أخرى',
+}
+
+export const COLLECTION_METHOD_LABELS: Record<CollectionMethod, string> = {
+  transfer: 'Bank transfer',
+  cheque: 'Cheque',
+  cash: 'Cash',
+}
+
+export const ADVANCE_TYPE_LABELS: Record<AdvanceType, string> = {
+  holiday: 'Holiday — سلفة عيد',
+  long_term: 'Long-term — طويلة الأجل',
+}
+
+export const ADVANCE_STATUS_LABELS: Record<AdvanceStatus, string> = {
+  active: 'Active',
+  settled: 'Settled',
+  cancelled: 'Cancelled',
+}
+
+export const CUSTODY_TXN_LABELS: Record<CustodyTxnType, string> = {
+  top_up: 'Top-up — إيداع',
+  expense: 'Expense — مصروف',
 }

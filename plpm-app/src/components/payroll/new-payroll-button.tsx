@@ -7,7 +7,8 @@ import { Modal } from '@/components/ui/modal'
 import { Button } from '@/components/ui/button'
 import { useToast } from '@/components/ui/toast'
 import { Plus } from 'lucide-react'
-import type { Site } from '@/types'
+import { dueByEmployee } from '@/lib/advances'
+import type { Site, WorkerAdvance } from '@/types'
 
 export function NewPayrollButton({ sites, month, year }: { sites: Site[]; month: number; year: number }) {
   const [open, setOpen] = useState(false)
@@ -65,6 +66,16 @@ export function NewPayrollButton({ sites, month, year }: { sites: Site[]; month:
         return
       }
 
+      // Prefill each worker's advance deduction from the advance ledger:
+      // holiday advances in full, long-term ones by their monthly installment.
+      const { data: activeAdvances } = await supabase
+        .from('worker_advances')
+        .select('*, repayments:advance_repayments(id, amount)')
+        .eq('status', 'active')
+        .in('employee_id', employees.map(e => e.id))
+        .order('advance_date', { ascending: true })
+      const advanceDue = dueByEmployee((activeAdvances ?? []) as WorkerAdvance[])
+
       // Explicitly zero every numeric column the manual "Add Employee" form
       // always sends, so this bulk insert doesn't depend on database defaults
       // existing for columns the rest of the app never omits.
@@ -87,7 +98,7 @@ export function NewPayrollButton({ sites, month, year }: { sites: Site[]; month:
         bonuses: 0,
         transportation_amount: 0,
         transportation_category: 0,
-        advance: 0,
+        advance: advanceDue.get(emp.id) ?? 0,
         insurance: 0,
         deductions: 0,
         penalties: 0,
@@ -156,7 +167,7 @@ export function NewPayrollButton({ sites, month, year }: { sites: Site[]; month:
                   <span className="block text-xs text-gray-500 mt-0.5">
                     {rosterCount === 0
                       ? 'This site has no active employees — the sheet will start empty.'
-                      : `${rosterCount} employee${rosterCount === 1 ? '' : 's'} will be added with their name, number, salary and daily wage.`}
+                      : `${rosterCount} employee${rosterCount === 1 ? '' : 's'} will be added with their name, number, salary, daily wage, and any advance installment due this month.`}
                   </span>
                 )}
               </span>
