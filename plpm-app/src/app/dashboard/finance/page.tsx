@@ -8,7 +8,7 @@ import { InvoiceStatusBadge } from '@/components/finance/invoice-status-badge'
 import { Banknote, TrendingUp, AlertTriangle } from 'lucide-react'
 import type { Invoice } from '@/types'
 
-interface SearchParams { month?: string; year?: string }
+interface SearchParams { month?: string; year?: string; site?: string; type?: string }
 
 const DAY_MS = 24 * 60 * 60 * 1000
 
@@ -20,19 +20,21 @@ export default async function FinancePage({ searchParams }: { searchParams: Prom
   const params = await searchParams
   const supabase = await createClient()
   const { month, year } = await resolvePeriod(supabase, params)
+  const siteFilter = params.site || null
+  const typeFilter = params.type || null
 
-  const [{ data: outstandingRaw }, { data: pipeline }, { data: periodInvoices }, { data: payrolls }, { data: expenses }] =
+  const [{ data: outstandingRaw }, { data: pipeline }, { data: periodInvoices }, { data: payrolls }, { data: expenses }, { data: sites }] =
     await Promise.all([
       // Issued but not yet collected — the receivables book, across all periods
       supabase.from('invoices')
-        .select('*, contract:contracts(id, name, payment_terms_days, client:clients(id, name))')
+        .select('*, contract:contracts(id, name, payment_terms_days, client:clients(id, name), contract_sites(site_id, site:sites(id, service_type)))')
         .in('status', ['issued', 'sent_to_client'])
         .order('issue_date', { ascending: true }),
       supabase.from('invoices')
         .select('id, net_amount')
         .in('status', ['draft', 'agreed', 'sent_to_accountant']),
       supabase.from('invoices')
-        .select('*, contract:contracts(id, name, client:clients(id, name), contract_sites(site_id, site:sites(id, name)))')
+        .select('*, contract:contracts(id, name, client:clients(id, name), contract_sites(site_id, site:sites(id, name, service_type)))')
         .eq('month', month).eq('year', year),
       supabase.from('payroll_periods')
         .select('site_id, total_gross')
@@ -40,10 +42,19 @@ export default async function FinancePage({ searchParams }: { searchParams: Prom
       supabase.from('expense_reports')
         .select('site_id, grand_total')
         .eq('month', month).eq('year', year),
+      supabase.from('sites').select('*').eq('active', true).order('sort_order'),
     ])
 
+  // An invoice matches when its contract covers the selected site / type
+  const matchesFilter = (inv: Invoice) => {
+    const links = inv.contract?.contract_sites ?? []
+    if (siteFilter && !links.some(cs => cs.site_id === siteFilter)) return false
+    if (typeFilter && !links.some(cs => cs.site?.service_type === typeFilter)) return false
+    return true
+  }
+
   // --- AR aging (by days since ETA issue date) ---
-  const outstanding = ((outstandingRaw ?? []) as Invoice[]).map(inv => {
+  const outstanding = ((outstandingRaw ?? []) as Invoice[]).filter(matchesFilter).map(inv => {
     const basis = inv.issue_date ?? inv.created_at.slice(0, 10)
     const age = daysSince(basis)
     const expected = Number(inv.net_amount) - Number(inv.withholding_amount)
@@ -84,7 +95,7 @@ export default async function FinancePage({ searchParams }: { searchParams: Prom
     expenseCost: number
     hasSites: boolean
   }>()
-  for (const inv of (periodInvoices ?? []) as Invoice[]) {
+  for (const inv of ((periodInvoices ?? []) as Invoice[]).filter(matchesFilter)) {
     const c = inv.contract
     if (!c) continue
     let entry = byContract.get(c.id)
@@ -116,7 +127,8 @@ export default async function FinancePage({ searchParams }: { searchParams: Prom
             Who owes what — المستحقات — and whether each contract made money in {formatMonthYear(month, year)}
           </p>
         </div>
-        <DashboardFilters currentMonth={month} currentYear={year} />
+        <DashboardFilters currentMonth={month} currentYear={year}
+          sites={sites ?? []} currentSite={siteFilter ?? undefined} currentType={typeFilter ?? undefined} />
       </div>
 
       {/* Aging buckets */}

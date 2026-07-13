@@ -8,20 +8,29 @@ import { DashboardFilters } from '@/components/dashboard/filters'
 import { NewPayrollButton } from '@/components/payroll/new-payroll-button'
 import { FileText } from 'lucide-react'
 
-interface SearchParams { month?: string; year?: string; site?: string }
+interface SearchParams { month?: string; year?: string; site?: string; type?: string }
 
 export default async function PayrollPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const params = await searchParams
   const supabase = await createClient()
   const { month, year } = await resolvePeriod(supabase, params)
+  const siteFilter = params.site || null
+  const typeFilter = params.type || null
 
-  const [{ data: periods }, { data: sites }] = await Promise.all([
+  const [{ data: allPeriods }, { data: sites }] = await Promise.all([
     supabase.from('payroll_periods')
       .select('*, site:sites(id, name, name_ar, service_type, client_name)')
       .eq('month', month).eq('year', year)
       .order('created_at', { ascending: false }),
     supabase.from('sites').select('*').eq('active', true).order('sort_order'),
   ])
+
+  const periods = (allPeriods ?? []).filter(p => {
+    const site = p.site as { service_type?: string } | null
+    if (siteFilter && p.site_id !== siteFilter) return false
+    if (typeFilter && site?.service_type !== typeFilter) return false
+    return true
+  })
 
   const totalNet = (periods ?? []).reduce((s, p) => s + Number(p.total_net ?? 0), 0)
 
@@ -33,7 +42,8 @@ export default async function PayrollPage({ searchParams }: { searchParams: Prom
           <p className="text-sm text-gray-500 mt-0.5">{formatMonthYear(month, year)}</p>
         </div>
         <div className="flex items-center gap-3">
-          <DashboardFilters currentMonth={month} currentYear={year} />
+          <DashboardFilters currentMonth={month} currentYear={year}
+            sites={sites ?? []} currentSite={siteFilter ?? undefined} currentType={typeFilter ?? undefined} />
           <NewPayrollButton sites={sites ?? []} month={month} year={year} />
         </div>
       </div>
