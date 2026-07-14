@@ -5,42 +5,70 @@ import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Modal } from '@/components/ui/modal'
 import { useToast } from '@/components/ui/toast'
-import { Pencil } from 'lucide-react'
+import { Pencil, UserPlus } from 'lucide-react'
 import type { UserProfile, UserRole } from '@/types'
 
 export function UserManager({ profiles: initial }: { profiles: UserProfile[] }) {
   const [profiles, setProfiles] = useState(initial)
   const [open, setOpen] = useState(false)
   const [editing, setEditing] = useState<UserProfile | null>(null)
-  const [form, setForm] = useState({ full_name: '', role: 'finance' as UserRole })
+  const [form, setForm] = useState({ email: '', full_name: '', role: 'finance' as UserRole })
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const toast = useToast()
 
   function openEdit(p: UserProfile) {
     setEditing(p)
-    setForm({ full_name: p.full_name, role: p.role })
+    setForm({ email: '', full_name: p.full_name, role: p.role })
+    setError('')
+    setOpen(true)
+  }
+
+  function openAdd() {
+    setEditing(null)
+    setForm({ email: '', full_name: '', role: 'finance' })
     setError('')
     setOpen(true)
   }
 
   async function handleSave() {
     if (!form.full_name.trim()) { setError('Name is required'); return }
-    if (!editing) return
+
+    if (editing) {
+      setSaving(true); setError('')
+      const supabase = createClient()
+      const { error: err } = await supabase
+        .from('user_profiles')
+        .update({ full_name: form.full_name.trim(), role: form.role })
+        .eq('id', editing.id)
+      if (err) { setError(err.message); setSaving(false); return }
+      setProfiles(prev => prev.map(p => p.id === editing.id ? { ...p, full_name: form.full_name.trim(), role: form.role } : p))
+      toast(`Updated ${form.full_name.trim()} (${form.role})`)
+      setSaving(false); setOpen(false)
+      return
+    }
+
+    if (!form.email.trim()) { setError('Email is required'); return }
     setSaving(true); setError('')
-    const supabase = createClient()
-    const { error: err } = await supabase
-      .from('user_profiles')
-      .update({ full_name: form.full_name.trim(), role: form.role })
-      .eq('id', editing.id)
-    if (err) { setError(err.message); setSaving(false); return }
-    setProfiles(prev => prev.map(p => p.id === editing.id ? { ...p, full_name: form.full_name.trim(), role: form.role } : p))
-    toast(`Updated ${form.full_name.trim()} (${form.role})`)
+    const res = await fetch('/api/admin/users', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: form.email.trim(), full_name: form.full_name.trim(), role: form.role }),
+    })
+    const body = await res.json().catch(() => ({}))
+    if (!res.ok) { setError(body.error ?? 'Failed to add user'); setSaving(false); return }
+    setProfiles(prev => [...prev, body.profile].sort((a, b) => a.full_name.localeCompare(b.full_name)))
+    toast(`Invited ${form.full_name.trim()} (${form.role})`)
     setSaving(false); setOpen(false)
   }
 
   return (
     <>
+      <div className="flex justify-end px-4 py-2.5 border-b border-gray-100">
+        <Button size="sm" onClick={openAdd}>
+          <UserPlus className="h-3.5 w-3.5" /> Add User
+        </Button>
+      </div>
       <div className="overflow-x-auto">
       <table className="w-full text-sm min-w-[480px]">
         <thead>
@@ -74,8 +102,16 @@ export function UserManager({ profiles: initial }: { profiles: UserProfile[] }) 
       </table>
       </div>
 
-      <Modal open={open} onClose={() => setOpen(false)} title="Edit User" size="sm">
+      <Modal open={open} onClose={() => setOpen(false)} title={editing ? 'Edit User' : 'Add User'} size="sm">
         <div className="space-y-4">
+          {!editing && (
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Email</label>
+              <input type="email" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
+                placeholder="name@professionalleaders.co"
+                className="w-full h-8 border border-gray-300 rounded-lg px-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            </div>
+          )}
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-1">Full Name</label>
             <input type="text" value={form.full_name} onChange={e => setForm(f => ({ ...f, full_name: e.target.value }))}
@@ -89,10 +125,13 @@ export function UserManager({ profiles: initial }: { profiles: UserProfile[] }) 
               <option value="admin">Admin</option>
             </select>
           </div>
+          {!editing && (
+            <p className="text-xs text-gray-500">An email invitation will be sent so they can set their own password.</p>
+          )}
           {error && <p className="text-sm text-red-600">{error}</p>}
           <div className="flex justify-end gap-2 pt-2 border-t border-gray-100">
             <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
-            <Button onClick={handleSave} loading={saving}>Save Changes</Button>
+            <Button onClick={handleSave} loading={saving}>{editing ? 'Save Changes' : 'Send Invite'}</Button>
           </div>
         </div>
       </Modal>
