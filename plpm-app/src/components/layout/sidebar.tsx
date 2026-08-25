@@ -105,6 +105,12 @@ export function Sidebar() {
               <Link
                 key={href}
                 href={href}
+                // Every page here is rendered per-request against live data, so
+                // prefetching the whole menu just runs 13 full page renders in
+                // the background on every single page view - the work that was
+                // making the app feel sluggish. Nothing is cached long enough
+                // for that to pay off.
+                prefetch={false}
                 onClick={() => setOpen(false)}
                 aria-current={active ? 'page' : undefined}
                 className={cn(

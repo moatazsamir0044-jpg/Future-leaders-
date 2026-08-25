@@ -53,7 +53,10 @@ export function DashboardFilters({ currentMonth, currentYear, sites, currentSite
     <div className="flex items-center gap-2 flex-wrap">
       <select
         value={currentMonth}
-        onChange={e => update({ month: e.target.value })}
+        // Month and year always travel together: resolvePeriod ignores a URL
+        // that carries only one of them, so sending the month on its own would
+        // silently leave the page on whichever period it already showed.
+        onChange={e => update({ month: e.target.value, year: String(currentYear) })}
         aria-label="Month"
         className={selectCls}
       >
@@ -63,7 +66,7 @@ export function DashboardFilters({ currentMonth, currentYear, sites, currentSite
       </select>
       <select
         value={currentYear}
-        onChange={e => update({ year: e.target.value })}
+        onChange={e => update({ year: e.target.value, month: String(currentMonth) })}
         aria-label="Year"
         className={selectCls}
       >

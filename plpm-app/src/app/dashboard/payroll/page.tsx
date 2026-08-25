@@ -108,6 +108,10 @@ export default async function PayrollPage({ searchParams }: { searchParams: Prom
                       <td className="px-4 py-3.5 text-right">
                         <Link
                           href={`/dashboard/payroll/${p.id}`}
+                          // Without this, opening this page prefetches every
+                          // site's sheet at once - each one a full render that
+                          // loads that site's several hundred worker rows.
+                          prefetch={false}
                           className="text-blue-600 hover:text-blue-800 text-sm font-medium"
                         >
                           Open →

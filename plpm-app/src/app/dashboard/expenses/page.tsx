@@ -110,6 +110,7 @@ export default async function ExpensesPage({ searchParams }: { searchParams: Pro
                       <td className="px-4 py-3.5 text-right">
                         <Link
                           href={`/dashboard/expenses/${r.id}`}
+                          prefetch={false}
                           className="text-purple-600 hover:text-purple-800 text-sm font-medium"
                         >
                           Open →
