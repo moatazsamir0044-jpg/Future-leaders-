@@ -98,21 +98,21 @@ export function InvoiceEditor({ invoice, deductions: initialDeductions }: {
     }
   }
 
+  // One transaction on the server. Deleting then re-inserting as two separate
+  // calls could leave the invoice with no deduction rows but a stale
+  // total_deductions if the second call failed.
   async function saveDeductions(): Promise<string | null> {
-    const { error: delErr } = await supabase.from('invoice_deductions').delete().eq('invoice_id', invoice.id)
-    if (delErr) return delErr.message
     const valid = rows.filter(r => (parseFloat(r.amount) || 0) !== 0 || r.description.trim())
-    if (valid.length > 0) {
-      const { error: insErr } = await supabase.from('invoice_deductions').insert(valid.map((r, i) => ({
-        invoice_id: invoice.id,
+    const { error } = await supabase.rpc('replace_invoice_deductions', {
+      p_invoice_id: invoice.id,
+      p_rows: valid.map((r, i) => ({
         reason: r.reason,
         description: r.description.trim() || null,
         amount: parseFloat(r.amount) || 0,
         sort_order: i,
-      })))
-      if (insErr) return insErr.message
-    }
-    return null
+      })),
+    })
+    return error ? error.message : null
   }
 
   async function handleSave() {

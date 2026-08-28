@@ -18,7 +18,8 @@ export function ApprovalRowActions({ entity, id, name }: { entity: ApprovalEntit
 
   async function act(status: 'approved' | 'rejected', rejectionNotes?: string) {
     setLoading(status)
-    const err = await updateApprovalStatus(entity, id, status, rejectionNotes)
+    // Rows only reach this component from the pending list, i.e. submitted.
+    const err = await updateApprovalStatus(entity, id, status, rejectionNotes, 'submitted')
     setLoading(null)
     if (err) {
       toast(`Could not update ${name}: ${err}`, 'error')

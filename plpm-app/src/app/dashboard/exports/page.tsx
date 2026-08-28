@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { q } from '@/lib/supabase/query'
 import { resolvePeriod } from '@/lib/period'
 import { formatCurrency, formatMonthYear } from '@/lib/utils'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -35,26 +36,26 @@ export default async function ExportsPage({ searchParams }: { searchParams: Prom
     { data: repayments },
     { data: custodyTxns },
   ] = await Promise.all([
-    supabase.from('invoices')
+    q(supabase.from('invoices')
       .select('*, contract:contracts(name, client:clients(name))')
-      .eq('month', month).eq('year', year),
-    supabase.from('invoices')
+      .eq('month', month).eq('year', year), 'invoices'),
+    q(supabase.from('invoices')
       .select('*, contract:contracts(name, client:clients(name))')
       .eq('status', 'collected')
-      .gte('collected_date', monthStart).lt('collected_date', monthEnd),
-    supabase.from('payroll_periods')
+      .gte('collected_date', monthStart).lt('collected_date', monthEnd), 'collections'),
+    q(supabase.from('payroll_periods')
       .select('id, site_id, total_gross, total_net, status, site:sites(name, name_ar)')
-      .eq('month', month).eq('year', year),
-    supabase.from('expense_reports')
+      .eq('month', month).eq('year', year), 'payroll sheets'),
+    q(supabase.from('expense_reports')
       .select('*, site:sites(name, name_ar)')
-      .eq('month', month).eq('year', year),
-    supabase.from('advance_repayments')
+      .eq('month', month).eq('year', year), 'expense reports'),
+    q(supabase.from('advance_repayments')
       .select('amount, source, advance:worker_advances(employee:employees(name, site:sites(name, name_ar)))')
-      .eq('month', month).eq('year', year),
-    supabase.from('custody_transactions')
+      .eq('month', month).eq('year', year), 'advance repayments'),
+    q(supabase.from('custody_transactions')
       .select('*, account:custody_accounts(name)')
       .gte('txn_date', monthStart).lt('txn_date', monthEnd)
-      .order('txn_date'),
+      .order('txn_date'), 'custody transactions'),
   ])
 
   // Per-site insurance and advance deductions come from the sheet lines
@@ -62,9 +63,9 @@ export default async function ExportsPage({ searchParams }: { searchParams: Prom
   const insuranceBySite = new Map<string, number>()
   const advancesBySite = new Map<string, number>()
   if (periodIds.length > 0) {
-    const { data: records } = await supabase.from('payroll_records')
+    const { data: records } = await q(supabase.from('payroll_records')
       .select('site_id, insurance, advance')
-      .in('period_id', periodIds)
+      .in('period_id', periodIds), 'payroll record lines')
     for (const r of records ?? []) {
       insuranceBySite.set(r.site_id, (insuranceBySite.get(r.site_id) ?? 0) + Number(r.insurance ?? 0))
       advancesBySite.set(r.site_id, (advancesBySite.get(r.site_id) ?? 0) + Number(r.advance ?? 0))

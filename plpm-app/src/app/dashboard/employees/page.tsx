@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { q } from '@/lib/supabase/query'
 import { formatCurrency } from '@/lib/utils'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { EmployeeManager } from '@/components/employees/employee-manager'
@@ -8,11 +9,11 @@ export default async function EmployeesPage() {
   const supabase = await createClient()
 
   const [{ data: employees }, { data: sites }] = await Promise.all([
-    supabase.from('employees')
+    q(supabase.from('employees')
       .select('*, site:sites(id, name, service_type)')
       .order('site_id')
-      .order('worker_number'),
-    supabase.from('sites').select('*').eq('active', true).order('sort_order'),
+      .order('worker_number'), 'employees'),
+    q(supabase.from('sites').select('*').eq('active', true).order('sort_order'), 'sites'),
   ])
 
   const active = (employees ?? []).filter(e => e.active)

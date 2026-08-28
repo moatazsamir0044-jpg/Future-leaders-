@@ -1,8 +1,9 @@
 import { createClient } from '@/lib/supabase/server'
+import { q, qMaybe } from '@/lib/supabase/query'
 import { notFound } from 'next/navigation'
 import { formatCurrency, formatMonthYear } from '@/lib/utils'
 import { StatusBadge } from '@/components/ui/badge'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card } from '@/components/ui/card'
 import { ExpenseTables } from '@/components/expenses/expense-tables'
 import { ExpenseActions } from '@/components/expenses/expense-actions'
 
@@ -16,17 +17,17 @@ export default async function ExpenseDetailPage({ params }: { params: Promise<{ 
     { data: accommodation },
     { data: items },
   ] = await Promise.all([
-    supabase.from('expense_reports').select('*, site:sites(*)').eq('id', id).single(),
-    supabase.from('expense_transportation').select('*').eq('report_id', id).order('sort_order'),
-    supabase.from('expense_accommodation').select('*').eq('report_id', id).order('sort_order'),
-    supabase.from('expense_items').select('*').eq('report_id', id).order('sort_order'),
+    qMaybe(supabase.from('expense_reports').select('*, site:sites(*)').eq('id', id).single(), 'this expense report'),
+    q(supabase.from('expense_transportation').select('*').eq('report_id', id).order('sort_order'), 'transportation lines'),
+    q(supabase.from('expense_accommodation').select('*').eq('report_id', id).order('sort_order'), 'accommodation lines'),
+    q(supabase.from('expense_items').select('*').eq('report_id', id).order('sort_order'), 'expense lines'),
   ])
 
   if (!report) notFound()
 
   const { data: { user } } = await supabase.auth.getUser()
   const { data: profile } = user
-    ? await supabase.from('user_profiles').select('*').eq('id', user.id).single()
+    ? await qMaybe(supabase.from('user_profiles').select('*').eq('id', user.id).single(), 'your profile')
     : { data: null }
 
   const site = report.site as { name: string; name_ar?: string; service_type: string; client_name?: string }

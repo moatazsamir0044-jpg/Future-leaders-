@@ -70,8 +70,6 @@ function TransportationTable({
     if (result.error) { setError(result.error.message); setSaving(false); return }
     const updated = editing ? rows.map(r => r.id === editing.id ? result.data : r) : [...rows, result.data]
     setRows(updated)
-    const recalcErr = await recalcTotals(supabase, reportId, { total_transportation: updated.reduce((s, r) => s + Number(r.total), 0) })
-    if (recalcErr) setError(`Saved, but report totals could not be updated: ${recalcErr}`)
     toast(editing ? `Updated "${payload.vehicle_name}"` : `Added "${payload.vehicle_name}"`)
     setOpen(false)
     startTransition(() => router.refresh())
@@ -92,8 +90,6 @@ function TransportationTable({
     }
     const updated = rows.filter(x => x.id !== r.id)
     setRows(updated)
-    const recalcErr = await recalcTotals(supabase, reportId, { total_transportation: updated.reduce((s, x) => s + Number(x.total), 0) })
-    if (recalcErr) setError(`Deleted, but report totals could not be updated: ${recalcErr}`)
     toast(`Deleted "${r.vehicle_name}"`)
     setDeleting(false)
     setDeleteTarget(null)
@@ -249,8 +245,6 @@ function AccommodationTable({
     if (result.error) { setError(result.error.message); setSaving(false); return }
     const updated = editing ? rows.map(r => r.id === editing.id ? result.data : r) : [...rows, result.data]
     setRows(updated)
-    const recalcErr = await recalcTotals(supabase, reportId, { total_accommodation: updated.reduce((s, r) => s + Number(r.rent_amount), 0) })
-    if (recalcErr) setError(`Saved, but report totals could not be updated: ${recalcErr}`)
     toast(editing ? `Updated "${payload.apartment_name}"` : `Added "${payload.apartment_name}"`)
     setOpen(false)
     startTransition(() => router.refresh())
@@ -271,8 +265,6 @@ function AccommodationTable({
     }
     const updated = rows.filter(x => x.id !== r.id)
     setRows(updated)
-    const recalcErr = await recalcTotals(supabase, reportId, { total_accommodation: updated.reduce((s, x) => s + Number(x.rent_amount), 0) })
-    if (recalcErr) setError(`Deleted, but report totals could not be updated: ${recalcErr}`)
     toast(`Deleted "${r.apartment_name}"`)
     setDeleting(false)
     setDeleteTarget(null)
@@ -415,8 +407,6 @@ function ItemsTable({
     if (result.error) { setError(result.error.message); setSaving(false); return }
     const updated = editing ? rows.map(r => r.id === editing.id ? result.data : r) : [...rows, result.data]
     setRows(updated)
-    const recalcErr = await recalcTotals(supabase, reportId, { total_other: updated.reduce((s, r) => s + Number(r.amount), 0) })
-    if (recalcErr) setError(`Saved, but report totals could not be updated: ${recalcErr}`)
     toast(editing ? `Updated "${payload.description}"` : `Added "${payload.description}"`)
     setOpen(false)
     startTransition(() => router.refresh())
@@ -437,8 +427,6 @@ function ItemsTable({
     }
     const updated = rows.filter(x => x.id !== r.id)
     setRows(updated)
-    const recalcErr = await recalcTotals(supabase, reportId, { total_other: updated.reduce((s, x) => s + Number(x.amount), 0) })
-    if (recalcErr) setError(`Deleted, but report totals could not be updated: ${recalcErr}`)
     toast(`Deleted "${r.description}"`)
     setDeleting(false)
     setDeleteTarget(null)
@@ -544,37 +532,6 @@ function ItemsTable({
       </Modal>
     </Card>
   )
-}
-
-/* ─── Shared recalc helper ───────────────────────────────────────────────── */
-
-// Updates only the section total that changed; the other sections' totals are
-// read from the report so they are never overwritten with stale/empty values.
-async function recalcTotals(
-  supabase: ReturnType<typeof createClient>,
-  reportId: string,
-  patch: Partial<{ total_transportation: number; total_accommodation: number; total_other: number }>,
-): Promise<string | null> {
-  const { data: report, error: fetchErr } = await supabase
-    .from('expense_reports')
-    .select('total_transportation, total_accommodation, total_other')
-    .eq('id', reportId)
-    .single()
-  if (fetchErr) return fetchErr.message
-
-  const totals = {
-    total_transportation: patch.total_transportation ?? Number(report.total_transportation ?? 0),
-    total_accommodation: patch.total_accommodation ?? Number(report.total_accommodation ?? 0),
-    total_other: patch.total_other ?? Number(report.total_other ?? 0),
-  }
-  const { error } = await supabase
-    .from('expense_reports')
-    .update({
-      ...totals,
-      grand_total: totals.total_transportation + totals.total_accommodation + totals.total_other,
-    })
-    .eq('id', reportId)
-  return error ? error.message : null
 }
 
 /* ─── Main export ────────────────────────────────────────────────────────── */

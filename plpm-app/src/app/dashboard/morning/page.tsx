@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { q } from '@/lib/supabase/query'
 import { Card } from '@/components/ui/card'
 import { MorningTable } from '@/components/finance/morning-table'
 import { formatCurrency } from '@/lib/utils'
@@ -36,11 +37,11 @@ export default async function MorningPage({ searchParams }: { searchParams: Prom
 
   const [{ data: sites }, { data: employees }, { data: budgets }, { data: payrolls }, { data: expenses }] =
     await Promise.all([
-      supabase.from('sites').select('*').eq('active', true).order('sort_order'),
-      supabase.from('employees').select('site_id').eq('active', true),
-      supabase.from('site_budgets').select('*').eq('month', month).eq('year', year),
-      supabase.from('payroll_periods').select('site_id, total_gross').eq('month', month).eq('year', year),
-      supabase.from('expense_reports').select('site_id, grand_total').eq('month', month).eq('year', year),
+      q(supabase.from('sites').select('*').eq('active', true).order('sort_order'), 'sites'),
+      q(supabase.from('employees').select('site_id').eq('active', true), 'the roster'),
+      q(supabase.from('site_budgets').select('*').eq('month', month).eq('year', year), 'site budgets'),
+      q(supabase.from('payroll_periods').select('site_id, total_gross').eq('month', month).eq('year', year), 'payroll sheets'),
+      q(supabase.from('expense_reports').select('site_id, grand_total').eq('month', month).eq('year', year), 'expense reports'),
     ])
 
   const headcountBySite = new Map<string, number>()

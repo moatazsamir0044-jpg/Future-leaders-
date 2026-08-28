@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { q, qMaybe } from '@/lib/supabase/query'
 import Link from 'next/link'
 import { resolvePeriod } from '@/lib/period'
 import { formatCurrency, formatMonthYear, cn } from '@/lib/utils'
@@ -23,18 +24,18 @@ export default async function ApprovalsPage({ searchParams }: { searchParams: Pr
     { data: pendingExpenses },
   ] = await Promise.all([
     supabase.auth.getUser(),
-    supabase.from('payroll_periods')
+    q(supabase.from('payroll_periods')
       .select('*, site:sites(name, service_type, client_name)')
       .eq('status', 'submitted')
-      .order('year').order('month').order('submitted_at', { ascending: true, nullsFirst: true }),
-    supabase.from('expense_reports')
+      .order('year').order('month').order('submitted_at', { ascending: true, nullsFirst: true }), 'pending payroll sheets'),
+    q(supabase.from('expense_reports')
       .select('*, site:sites(name, service_type, client_name)')
       .eq('status', 'submitted')
-      .order('year').order('month').order('submitted_at', { ascending: true, nullsFirst: true }),
+      .order('year').order('month').order('submitted_at', { ascending: true, nullsFirst: true }), 'pending expense reports'),
   ])
 
   const { data: profile } = user
-    ? await supabase.from('user_profiles').select('role').eq('id', user.id).single()
+    ? await qMaybe(supabase.from('user_profiles').select('role').eq('id', user.id).single(), 'your profile')
     : { data: null }
   const isAdmin = profile?.role === 'admin'
 
@@ -49,16 +50,16 @@ export default async function ApprovalsPage({ searchParams }: { searchParams: Pr
     month = resolved.month
     year = resolved.year
     const [{ data: hp }, { data: he }] = await Promise.all([
-      supabase.from('payroll_periods')
+      q(supabase.from('payroll_periods')
         .select('*, site:sites(name, service_type, client_name)')
         .eq('month', month).eq('year', year)
         .in('status', ['submitted', 'approved', 'rejected'])
-        .order('created_at', { ascending: false }),
-      supabase.from('expense_reports')
+        .order('created_at', { ascending: false }), 'payroll approval history'),
+      q(supabase.from('expense_reports')
         .select('*, site:sites(name, service_type, client_name)')
         .eq('month', month).eq('year', year)
         .in('status', ['submitted', 'approved', 'rejected'])
-        .order('created_at', { ascending: false }),
+        .order('created_at', { ascending: false }), 'expense approval history'),
     ])
     historyPayroll = hp ?? []
     historyExpenses = he ?? []

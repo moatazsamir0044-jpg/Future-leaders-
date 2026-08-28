@@ -43,7 +43,7 @@ export function ExpenseActions({ report, transportation, accommodation, items, s
   async function updateStatus(newStatus: WorkflowStatus, notes?: string) {
     setLoading(newStatus)
     setActionError('')
-    const err = await updateApprovalStatus('expense', report.id, newStatus, notes)
+    const err = await updateApprovalStatus('expense', report.id, newStatus, notes, status as WorkflowStatus)
     if (err) {
       setActionError(`Could not update status: ${err}`)
       toast('Status update failed', 'error')
@@ -63,15 +63,35 @@ export function ExpenseActions({ report, transportation, accommodation, items, s
     setError('')
   }
 
+  // Both exports are async (ExcelJS serialises the workbook, the PDF loads an
+  // embedded Arabic font). Failures used to be unhandled promise rejections,
+  // so a broken export looked like a button that simply did nothing.
+  async function runExport(kind: 'excel' | 'pdf') {
+    setLoading(kind)
+    setActionError('')
+    try {
+      if (kind === 'excel') await exportExpenseToExcel(report, site, transportation, accommodation, items)
+      else await exportExpenseToPDF(report, site, transportation, accommodation, items)
+    } catch (e) {
+      const message = e instanceof Error ? e.message : String(e)
+      setActionError(`Could not build the ${kind === 'excel' ? 'Excel' : 'PDF'} export: ${message}`)
+      toast('Export failed', 'error')
+    } finally {
+      setLoading(null)
+    }
+  }
+
   return (
     <div className="flex items-center gap-2 flex-wrap">
       {actionError && (
         <p className="w-full text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{actionError}</p>
       )}
-      <Button variant="outline" size="sm" onClick={() => exportExpenseToExcel(report, site, transportation, accommodation, items)} disabled={!hasData}>
+      <Button variant="outline" size="sm" onClick={() => runExport('excel')}
+        loading={loading === 'excel'} disabled={!hasData}>
         <FileSpreadsheet className="h-3.5 w-3.5" /> Excel
       </Button>
-      <Button variant="outline" size="sm" onClick={() => exportExpenseToPDF(report, site, transportation, accommodation, items)} disabled={!hasData}>
+      <Button variant="outline" size="sm" onClick={() => runExport('pdf')}
+        loading={loading === 'pdf'} disabled={!hasData}>
         <FileText className="h-3.5 w-3.5" /> PDF
       </Button>
 
@@ -93,9 +113,12 @@ export function ExpenseActions({ report, transportation, accommodation, items, s
         </>
       )}
 
-      {(status === 'approved' || status === 'rejected') && isAdmin && (
+      {/* Undoing an approval is an admin decision. Picking up a rejection is
+          not - it is the author acting on the correction they were asked for,
+          so gating it on an admin would leave the report stuck. */}
+      {(status === 'rejected' || (status === 'approved' && isAdmin)) && (
         <Button size="sm" variant="outline" onClick={() => updateStatus('draft')} loading={loading === 'draft'}>
-          <RotateCcw className="h-3.5 w-3.5" /> Reset to Draft
+          <RotateCcw className="h-3.5 w-3.5" /> {status === 'rejected' ? 'Reopen for Editing' : 'Reset to Draft'}
         </Button>
       )}
 

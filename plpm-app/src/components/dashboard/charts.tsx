@@ -2,7 +2,7 @@
 
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { formatCurrency, serviceTypeLabel } from '@/lib/utils'
+import { formatCurrency } from '@/lib/utils'
 
 interface Props {
   payrollPeriods: Array<{ site?: { name: string; service_type: string }; total_net: number; total_gross: number; status: string }>

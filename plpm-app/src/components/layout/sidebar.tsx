@@ -24,10 +24,10 @@ const nav = [
   { href: '/dashboard/exports', label: 'Accountant Export', icon: FileSpreadsheet },
   { href: '/dashboard/employees', label: 'Employees', icon: Users },
   { href: '/dashboard/approvals', label: 'Approvals', icon: CheckSquare },
-  { href: '/dashboard/settings', label: 'Settings', icon: Settings },
+  { href: '/dashboard/settings', label: 'Settings', icon: Settings, adminOnly: true },
 ]
 
-export function Sidebar() {
+export function Sidebar({ isAdmin }: { isAdmin: boolean }) {
   const pathname = usePathname()
   const router = useRouter()
   const [open, setOpen] = useState(false)
@@ -99,7 +99,7 @@ export function Sidebar() {
 
         {/* Navigation */}
         <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
-          {nav.map(({ href, label, icon: Icon }) => {
+          {nav.filter(item => isAdmin || !item.adminOnly).map(({ href, label, icon: Icon }) => {
             const active = pathname === href || (href !== '/dashboard' && pathname.startsWith(href))
             return (
               <Link
