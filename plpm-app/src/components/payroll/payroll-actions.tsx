@@ -60,12 +60,22 @@ export function PayrollActions({ period, records, site, role }: Props) {
     setError('')
   }
 
-  function handleExcelExport() {
-    exportPayrollToExcel(period, site, records)
-  }
-
-  function handlePDFExport() {
-    exportPayrollToPDF(period, site, records)
+  // Both exports are async (ExcelJS serialises the workbook, the PDF loads an
+  // embedded Arabic font). Failures used to be unhandled promise rejections,
+  // so a broken export looked like a button that simply did nothing.
+  async function runExport(kind: 'excel' | 'pdf') {
+    setLoading(kind)
+    setActionError('')
+    try {
+      if (kind === 'excel') await exportPayrollToExcel(period, site, records)
+      else await exportPayrollToPDF(period, site, records)
+    } catch (e) {
+      const message = e instanceof Error ? e.message : String(e)
+      setActionError(`Could not build the ${kind === 'excel' ? 'Excel' : 'PDF'} export: ${message}`)
+      toast('Export failed', 'error')
+    } finally {
+      setLoading(null)
+    }
   }
 
   return (
@@ -74,10 +84,12 @@ export function PayrollActions({ period, records, site, role }: Props) {
         <p className="w-full text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{actionError}</p>
       )}
       {/* Export buttons — always visible */}
-      <Button variant="outline" size="sm" onClick={handleExcelExport} disabled={records.length === 0}>
+      <Button variant="outline" size="sm" onClick={() => runExport('excel')}
+        loading={loading === 'excel'} disabled={records.length === 0}>
         <FileSpreadsheet className="h-3.5 w-3.5" /> Excel
       </Button>
-      <Button variant="outline" size="sm" onClick={handlePDFExport} disabled={records.length === 0}>
+      <Button variant="outline" size="sm" onClick={() => runExport('pdf')}
+        loading={loading === 'pdf'} disabled={records.length === 0}>
         <FileText className="h-3.5 w-3.5" /> PDF
       </Button>
 
