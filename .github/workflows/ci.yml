@@ -1,12 +1,15 @@
 name: CI
 
+# Branch pushes are covered by the pull_request trigger, so pushing to a branch
+# with an open PR would otherwise run every job twice. Restricting push to the
+# default branch keeps trunk covered without duplicating PR runs.
 on:
   push:
-    branches: ['**']
+    branches: [main]
   pull_request:
 
 concurrency:
-  group: ci-${{ github.ref }}
+  group: ci-${{ github.head_ref || github.ref }}
   cancel-in-progress: true
 
 defaults:
