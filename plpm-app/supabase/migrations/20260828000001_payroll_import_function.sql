@@ -158,5 +158,11 @@ $$;
 comment on function public.import_payroll_sheet(uuid, integer, integer, jsonb) is
   'Replaces one site''s payroll sheet for a month in a single transaction. Refuses submitted/approved periods. Stores the sheet''s own figures without recomputing them.';
 
+-- Supabase's default privileges on the public schema grant EXECUTE on every new
+-- function to anon as well as authenticated, so anon has to be revoked by name;
+-- revoking from PUBLIC alone does not remove it. Row-level security would
+-- already refuse an anonymous caller's writes, but importing payroll is not
+-- something a signed-out request should be able to reach at all.
 revoke all on function public.import_payroll_sheet(uuid, integer, integer, jsonb) from public;
+revoke all on function public.import_payroll_sheet(uuid, integer, integer, jsonb) from anon;
 grant execute on function public.import_payroll_sheet(uuid, integer, integer, jsonb) to authenticated;
