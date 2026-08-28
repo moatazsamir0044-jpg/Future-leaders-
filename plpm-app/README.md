@@ -1,36 +1,91 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# PLPM — Professional Leaders operations platform
 
-## Getting Started
+Internal system for a facility-management contractor in Egypt: monthly payroll
+sheets per site, site expense reports, client invoicing and receivables, a
+worker advance ledger, cash custody (العهدة), and the monthly handoff pack for
+the external accountant.
 
-First, run the development server:
+Next.js 16 (App Router) with Supabase for auth and Postgres.
+
+## Running locally
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+cp .env.example .env.local     # fill in from Supabase → Project Settings → API
+npm install
+npm run dev                    # http://localhost:3000
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+`NEXT_PUBLIC_*` variables are inlined into the bundle at build time, not read
+at runtime. They must be set **before** `next build` — in Vercel that means
+project environment variables, not runtime config. The build fails with a named
+error if either is missing, so a deployment can't silently come up pointing at
+nothing.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+`SUPABASE_SERVICE_ROLE_KEY` is server-only and optional. It is used by
+`/api/admin/users` to send account invitations; without it that one feature
+returns a clear error and everything else works.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Checks
 
-## Learn More
+```bash
+npm run lint
+npm run typecheck
+npm test           # unit tests (vitest)
+npm run test:db    # migrations + RLS policy tests, needs a local PostgreSQL
+npm run build
+```
 
-To learn more about Next.js, take a look at the following resources:
+`npm run test:db` builds a throwaway database from `supabase/migrations` and
+asserts the authorization rules hold. It needs a PostgreSQL you can create
+databases on; it honours the usual `PG*` environment variables.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+CI runs all of the above on every push (`.github/workflows/ci.yml`).
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Where the rules live
 
-## Deploy on Vercel
+**Authorization is enforced in the database, not in React.** The browser holds
+the Supabase anon key and can call PostgREST directly, so any check that exists
+only in a component is advisory. Row-Level Security policies and triggers in
+`supabase/migrations/20260828000001_harden_authorization_and_totals.sql` are
+what actually hold:
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+- Only admins can change a user's role, and the last admin can't be demoted.
+- Only admins can approve, reject, or reopen a payroll sheet or expense report,
+  and status can't skip a step (a draft can't jump straight to approved).
+- `submitted_by` / `approved_by` are stamped from the session server-side, so a
+  client can't claim someone else approved a sheet.
+- Submitted and approved sheets are frozen — their line items can't be edited,
+  added to, or deleted until an admin reopens them.
+- Sheet and report totals are derived by trigger from their line rows. Clients
+  cannot set them; a PATCH naming those columns is ignored.
+- `approval_logs` is append-only.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+`src/lib/approvals.ts` mirrors the transition table so the UI can fail with a
+readable message, and a unit test asserts the two stay in step. If you change
+one, change both.
+
+## Database
+
+Migrations in `supabase/migrations` build the schema from nothing, in order.
+`20260629000000_baseline_schema.sql` is the baseline; the hosted project
+predates it, so mark it applied there rather than running it:
+
+```bash
+supabase migration repair --status applied 20260629000000
+```
+
+`supabase/tests/_supabase_shim.sql` stands in for the Supabase-provided pieces
+(`auth` schema, `auth.uid()`, roles) so the migrations can run on plain
+PostgreSQL in CI. It is never applied to a real Supabase project.
+
+## Exports
+
+Excel exports (ExcelJS) are the primary format — they mirror the source
+spreadsheets and are what the accounting office receives. PDF exports embed a
+subset of Noto Naskh Arabic; jsPDF's built-in fonts have no Arabic glyphs, so
+without it every worker name rendered as mojibake. The font is dynamically
+imported, so only someone exporting a PDF downloads it.
+
+## Known gaps
+
+See `docs/production-readiness.md`.

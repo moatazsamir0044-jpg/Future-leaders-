@@ -5,11 +5,16 @@
 // read from the environment rather than hard-coded, so that staging and
 // production can point at different projects and a leaked key can be rotated
 // without a code change.
+// NEXT_PUBLIC_* values are inlined at build time, not read at runtime, so this
+// fires during `next build` rather than on the first request. That is the point:
+// a deployment that would have started against no database fails in CI instead.
 function required(name: string, value: string | undefined): string {
   if (!value) {
     throw new Error(
-      `${name} is not set. Copy .env.example to .env.local (or set it in your ` +
-        `hosting provider) with the values from your Supabase project settings.`,
+      `${name} is not set. Copy .env.example to .env.local for local work, or set ` +
+        `it in your hosting provider BEFORE the build — NEXT_PUBLIC_* variables are ` +
+        `baked into the bundle at build time. Values are in Supabase → Project ` +
+        `Settings → API.`,
     )
   }
   return value
