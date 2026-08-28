@@ -50,6 +50,39 @@ exception when others then
   return -1;
 end $$;
 
+-- Runs `stmt` as the anonymous role and reports whether it was rejected or
+-- silently filtered to zero rows. Either outcome means anon cannot write.
+create or replace function pg_temp.anon_blocked(stmt text)
+returns boolean language plpgsql as $$
+declare n integer;
+begin
+  perform set_config('request.jwt.claims', '{"role":"anon"}', true);
+  execute 'set local role anon';
+  execute stmt;
+  get diagnostics n = row_count;
+  execute 'reset role';
+  return n = 0;
+exception when others then
+  execute 'reset role';
+  return true;
+end $$;
+
+-- Returns how many rows the anonymous role can actually see, so a read policy
+-- that silently stops filtering is caught rather than assumed.
+create or replace function pg_temp.anon_visible_rows(stmt text)
+returns bigint language plpgsql as $$
+declare n bigint;
+begin
+  perform set_config('request.jwt.claims', '{"role":"anon"}', true);
+  execute 'set local role anon';
+  execute stmt into n;
+  execute 'reset role';
+  return n;
+exception when others then
+  execute 'reset role';
+  return 0;
+end $$;
+
 do $$
 declare
   admin_id uuid := '11111111-1111-1111-1111-111111111111';
@@ -213,6 +246,25 @@ begin
   perform pg_temp.expect('audit rows cannot be rewritten',
     pg_temp.rows_changed(admin_id,
       'update public.approval_logs set notes = ''tampered'' where action = ''reset_to_draft''') <= 0);
+
+  -- ── 6. anonymous callers ────────────────────────────────────────────────
+  -- is_privileged_context() exempts requests with no authenticated user so that
+  -- migrations and service-role jobs are not caught by the guards. An anonymous
+  -- request looks the same to it, so RLS has to be what stops anon -- these
+  -- assertions are what makes that exemption safe to keep.
+  perform pg_temp.expect('anon cannot change a sheet status',
+    pg_temp.anon_blocked(
+      format('update public.payroll_periods set status = ''draft'' where id = %L', draft_period)));
+  perform pg_temp.expect('anon cannot write payroll records',
+    pg_temp.anon_blocked(
+      format('insert into public.payroll_records (period_id, site_id, employee_name) values (%L, %L, ''X'')',
+             draft_period, site_id)));
+  perform pg_temp.expect('anon cannot grant itself a role',
+    pg_temp.anon_blocked('update public.user_profiles set role = ''admin'''));
+  perform pg_temp.expect('anon cannot read payroll',
+    pg_temp.anon_visible_rows('select count(*) from public.payroll_periods') = 0);
+  perform pg_temp.expect('anon cannot read user profiles',
+    pg_temp.anon_visible_rows('select count(*) from public.user_profiles') = 0);
 
   -- ── 6. last admin ───────────────────────────────────────────────────────
   perform pg_temp.expect('the last remaining admin cannot be demoted',
