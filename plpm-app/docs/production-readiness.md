@@ -89,7 +89,27 @@ Apply to a branch or a restored snapshot first. The behaviour changes are real:
 approved sheets become read-only, non-admins lose the approve button's effect,
 and totals stop accepting client values.
 
-### 2. The employee roster is empty
+### 2. Vercel needs the Supabase variables before the next deploy
+
+Removing the hard-coded URL and anon key means the Vercel project must now
+supply them. It never has, so the build stops:
+
+```
+Error: Failed to collect configuration for /api/admin/users
+  [cause]: Error: NEXT_PUBLIC_SUPABASE_URL is not set.
+```
+
+That is the guard doing its job — better a failed build than a deployment
+pointing at nothing — but **production cannot deploy until they are set**. Add
+`NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` under the Vercel
+project's environment variables for Production, Preview and Development, then
+rebuild. `NEXT_PUBLIC_*` is inlined at build time, so setting them without a
+rebuild changes nothing.
+
+`SUPABASE_SERVICE_ROLE_KEY` is optional and server-only; without it, inviting
+users returns a clear error and the rest of the app works.
+
+### 3. The employee roster is empty
 
 `employees` has **0 rows** against 6,051 payroll records. Everything keyed off
 the roster is therefore inert: new-sheet prefill, advance ledger matching, and
@@ -101,46 +121,46 @@ Decide whether the roster is going to be maintained. If yes, it needs an import
 and a rule for who keeps it current. If no, the advance ledger and morning
 report should be removed rather than left showing zeros.
 
-### 3. No backup or recovery plan
+### 4. No backup or recovery plan
 
 Nothing in the repository or the project settings documents backup frequency,
 retention, or a tested restore. This is payroll data for ~1,700 workers. Supabase's
 automatic backups depend on your plan; confirm what you actually have, and
 rehearse a restore before you need one.
 
-### 4. No error tracking
+### 5. No error tracking
 
 No Sentry, no structured logging, no alerting. A server-side failure now reaches
 the user as an error boundary, which is an improvement, but nobody is told. You
 will find out about breakage when someone mentions it.
 
-### 5. Unbounded queries
+### 6. Unbounded queries
 
 45 list queries have no `limit` or pagination. `/dashboard/advances`,
 `/dashboard/custody` and `/dashboard/employees` load every row ever created.
 Fine at today's volumes, a cliff as history accumulates — the advances page in
 particular grows forever because settled advances are never archived.
 
-### 6. `/api/admin/users` has no rate limit
+### 7. `/api/admin/users` has no rate limit
 
 It is admin-gated, but an authenticated admin can drive unlimited invitation
 emails through it. Supabase's own limits are the only backstop.
 
-### 7. Only approvals are audited
+### 8. Only approvals are audited
 
 `approval_logs` records status transitions. Nothing records who changed a
 worker's salary, edited a payroll figure, or deleted a line — the changes that
 actually move money. Consider row-level history on `payroll_records` and
 `employees`.
 
-### 8. Two roles for a wider org
+### 9. Two roles for a wider org
 
 `admin` and `finance` are the only roles, and `finance` can read and write every
 site's data. There is no site-scoped access, so a site supervisor cannot be
 given their own sheet without seeing all 44. Fine for a small finance team;
 a blocker if this reaches site level.
 
-### 9. Smaller items
+### 10. Smaller items
 
 - **Leaked-password protection is off** in Supabase Auth. One toggle; turn it on.
 - **Two dead functions**, `is_admin()` and `current_role_name()`, query a
@@ -160,10 +180,11 @@ a blocker if this reaches site level.
 ## Verdict
 
 The system is **sound to deploy once the migrations are applied** (item 1) and
-you have answered the roster question (item 2). Those two are the difference
-between a working system and one that is quietly wrong.
+the Vercel variables are set (item 2). Item 3, the empty roster, is the
+difference between a working system and one that is quietly wrong in two of its
+screens.
 
-Items 3 and 4 — backups and error tracking — are what separates "it runs" from
+Items 4 and 5 — backups and error tracking — are what separates "it runs" from
 "you can operate it". They are not code changes and should be settled before
 this carries a month of real payroll on its own.
 
