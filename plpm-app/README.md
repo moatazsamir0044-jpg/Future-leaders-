@@ -50,8 +50,10 @@ only in a component is advisory. Row-Level Security policies and triggers in
 what actually hold:
 
 - Only admins can change a user's role, and the last admin can't be demoted.
-- Only admins can approve, reject, or reopen a payroll sheet or expense report,
-  and status can't skip a step (a draft can't jump straight to approved).
+- Only admins can approve, reject, or undo an approval, and status can't skip a
+  step (a draft can't jump straight to approved). Reopening a *rejected* record
+  is not admin-gated — that is its author acting on the correction they were
+  asked for.
 - `submitted_by` / `approved_by` are stamped from the session server-side, so a
   client can't claim someone else approved a sheet.
 - Submitted and approved sheets are frozen — their line items can't be edited,

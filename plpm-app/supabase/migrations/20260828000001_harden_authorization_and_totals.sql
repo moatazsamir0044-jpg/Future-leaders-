@@ -113,11 +113,15 @@ begin
       using errcode = 'check_violation';
   end if;
 
-  -- Approving, rejecting and reopening are administrative decisions.
+  -- Approving and rejecting are the reviewer's decisions, and undoing an
+  -- approval is privileged because it reopens figures that were signed off.
+  -- Reopening a *rejected* sheet is not: that is its author picking up the
+  -- correction they were asked for, and gating it on an admin would make a
+  -- rejection a dead end only an admin could clear.
   if new.status in ('approved', 'rejected')
-     or (old.status in ('approved', 'rejected') and new.status = 'draft') then
+     or (old.status = 'approved' and new.status = 'draft') then
     if not public.is_plpm_admin() then
-      raise exception 'Only an admin can approve, reject, or reopen this record'
+      raise exception 'Only an admin can approve, reject, or reopen an approved record'
         using errcode = 'insufficient_privilege';
     end if;
   end if;
@@ -133,8 +137,11 @@ begin
     new.approved_at := now();
     new.rejection_notes := null;
   elsif new.status = 'rejected' then
-    new.approved_by := auth.uid();
-    new.approved_at := now();
+    -- Deliberately not approved_by: a column named "approved by" holding the
+    -- person who rejected the sheet would be read back as an approval. Who
+    -- rejected it, and why, is in approval_logs.
+    new.approved_by := null;
+    new.approved_at := null;
   elsif new.status = 'draft' then
     new.submitted_by := null;
     new.submitted_at := null;

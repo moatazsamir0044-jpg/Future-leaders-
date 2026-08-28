@@ -136,6 +136,24 @@ begin
     pg_temp.denied(finance_id,
       format('update public.payroll_periods set status = ''draft'' where id = %L', draft_period)));
 
+  -- Rejection path: an expense report submitted, then rejected by the admin.
+  perform pg_temp.rows_changed(finance_id,
+    format('update public.expense_reports set status = ''submitted'' where id = %L', v_report_id));
+  perform pg_temp.expect('admin can reject a submitted report with a reason',
+    pg_temp.rows_changed(admin_id,
+      format('update public.expense_reports set status = ''rejected'', rejection_notes = ''Fix the transport lines'' where id = %L', v_report_id)) = 1);
+  perform pg_temp.expect('rejection keeps the reviewer note',
+    (select rejection_notes from public.expense_reports where id = v_report_id) = 'Fix the transport lines');
+  perform pg_temp.expect('rejection does not record an approver',
+    (select approved_by from public.expense_reports where id = v_report_id) is null
+    and (select approved_at from public.expense_reports where id = v_report_id) is null);
+  -- The author must be able to act on a rejection without waiting for an admin.
+  perform pg_temp.expect('a rejected report can be reopened by its author',
+    pg_temp.rows_changed(finance_id,
+      format('update public.expense_reports set status = ''draft'' where id = %L', v_report_id)) = 1);
+  perform pg_temp.expect('reopening clears the rejection note',
+    (select rejection_notes from public.expense_reports where id = v_report_id) is null);
+
   -- ── 3. approved sheets are frozen ───────────────────────────────────────
   perform pg_temp.expect('records of an approved sheet cannot be edited',
     pg_temp.denied(finance_id,
@@ -151,6 +169,15 @@ begin
     pg_temp.denied(finance_id,
       format('insert into public.expense_items (report_id, description, amount) values (%L, ''X'', 5)',
              approved_period)));
+
+  perform pg_temp.expect('admin can reopen an approved sheet',
+    pg_temp.rows_changed(admin_id,
+      format('update public.payroll_periods set status = ''draft'' where id = %L', draft_period)) = 1);
+  perform pg_temp.expect('reopening clears the approval stamp',
+    (select approved_by from public.payroll_periods where id = draft_period) is null);
+  perform pg_temp.expect('records are editable again once reopened',
+    pg_temp.rows_changed(finance_id,
+      format('update public.payroll_records set bonuses = 50 where period_id = %L', draft_period)) = 1);
 
   -- ── 4. derived totals ───────────────────────────────────────────────────
   perform pg_temp.expect('sheet totals track their records',

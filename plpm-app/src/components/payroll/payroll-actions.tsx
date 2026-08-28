@@ -112,9 +112,12 @@ export function PayrollActions({ period, records, site, role }: Props) {
         </>
       )}
 
-      {(status === 'approved' || status === 'rejected') && isAdmin && (
+      {/* Undoing an approval is an admin decision. Picking up a rejection is
+          not - it is the author acting on the correction they were asked for,
+          so gating it on an admin would leave the sheet stuck. */}
+      {(status === 'rejected' || (status === 'approved' && isAdmin)) && (
         <Button size="sm" variant="outline" onClick={() => updateStatus('draft')} loading={loading === 'draft'}>
-          <RotateCcw className="h-3.5 w-3.5" /> Reset to Draft
+          <RotateCcw className="h-3.5 w-3.5" /> {status === 'rejected' ? 'Reopen for Editing' : 'Reset to Draft'}
         </Button>
       )}
 
