@@ -65,8 +65,9 @@ and CI proves it on every push.
 
 - **62 unit tests** over the payroll formula, advance ledger, approval
   transitions, period resolution, and the PDF export.
-- **24 SQL assertions** that build a database from the migrations and prove the
-  policies refuse what the UI hides — including both exploits above.
+- **37 SQL assertions** that build a database from the migrations and prove the
+  policies refuse what the UI hides — including both exploits above, and that an
+  anonymous caller cannot reach the guards at all.
 - **CI** running lint, typecheck, tests, build, `npm audit`, and the database
   suite on every push.
 
@@ -74,20 +75,34 @@ and CI proves it on every push.
 
 ## Outstanding
 
-### 1. The migrations are not applied to production
+### 1. ~~The migrations are not applied to production~~ — done
 
-The fixes above exist as migration files. They have **not** been applied to the
-live project — that was left as your call. Until they run, both exploits remain
-open on the deployed system.
+Applied to the live project on 2026-08-28 and verified against it:
 
-```bash
-supabase migration repair --status applied 20260629000000   # baseline is already there
-supabase db push
-```
+| | |
+| --- | --- |
+| Role-assignment policy, last-admin guard | applied |
+| Approval workflow triggers | applied |
+| Frozen-sheet guards | applied |
+| Derived-totals triggers | applied |
+| `approval_logs` constraint | applied; 2 legacy `reset` rows migrated to `reset_to_draft` |
+| `replace_invoice_deductions` RPC | applied |
+| Payroll data | 6,051 records / 70 periods, unchanged |
 
-Apply to a branch or a restored snapshot first. The behaviour changes are real:
-approved sheets become read-only, non-admins lose the approve button's effect,
-and totals stop accepting client values.
+Both original exploits were re-tested against the live database and are refused:
+self-promotion to admin fails the row-level security policy, and a non-admin
+approving a submitted sheet raises *"Only an admin can approve, reject, or
+reopen an approved record"*.
+
+Note for anyone applying this elsewhere: do **not** run `supabase db push`
+against a database that already holds this data. Two of the migrations are
+one-shot May-2026 payroll imports, and re-running them deletes and re-inserts
+1,946 real records. Only `20260828000001` and `20260828000002` were new; the
+rest already existed. They were applied through the Supabase SQL editor.
+
+The behaviour changes are now live: approved sheets are read-only until an
+admin reopens them, only admins can approve or reject, and totals are derived
+by the database rather than accepted from the client.
 
 ### 2. Vercel needs the Supabase variables before the next deploy
 
@@ -179,10 +194,11 @@ a blocker if this reaches site level.
 
 ## Verdict
 
-The system is **sound to deploy once the migrations are applied** (item 1) and
-the Vercel variables are set (item 2). Item 3, the empty roster, is the
-difference between a working system and one that is quietly wrong in two of its
-screens.
+The database is hardened and verified (item 1). What remains before the
+application changes are actually serving traffic is item 2 — the Vercel
+variables — and merging the pull request, since production currently runs the
+pre-review code. Item 3, the empty roster, is the difference between a working
+system and one that is quietly wrong in two of its screens.
 
 Items 4 and 5 — backups and error tracking — are what separates "it runs" from
 "you can operate it". They are not code changes and should be settled before
