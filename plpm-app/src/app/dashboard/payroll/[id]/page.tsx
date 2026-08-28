@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { q, qMaybe } from '@/lib/supabase/query'
 import { notFound } from 'next/navigation'
 import { formatCurrency, formatMonthYear } from '@/lib/utils'
 import { StatusBadge } from '@/components/ui/badge'
@@ -11,21 +12,21 @@ export default async function PayrollDetailPage({ params }: { params: Promise<{ 
   const supabase = await createClient()
 
   const [{ data: period }, { data: records }] = await Promise.all([
-    supabase.from('payroll_periods')
+    qMaybe(supabase.from('payroll_periods')
       .select('*, site:sites(*)')
       .eq('id', id)
-      .single(),
-    supabase.from('payroll_records')
+      .single(), 'this payroll sheet'),
+    q(supabase.from('payroll_records')
       .select('*')
       .eq('period_id', id)
-      .order('worker_number'),
+      .order('worker_number'), 'payroll records'),
   ])
 
   if (!period) notFound()
 
   const { data: { user } } = await supabase.auth.getUser()
   const { data: profile } = user
-    ? await supabase.from('user_profiles').select('*').eq('id', user.id).single()
+    ? await qMaybe(supabase.from('user_profiles').select('*').eq('id', user.id).single(), 'your profile')
     : { data: null }
 
   const site = period.site as { name: string; name_ar?: string; service_type: string; client_name?: string }

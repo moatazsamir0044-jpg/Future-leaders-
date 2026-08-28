@@ -7,7 +7,7 @@
 -- note amount on the invoice, matching current practice.
 
 create table if not exists clients (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default extensions.uuid_generate_v4(),
   name text not null,
   name_ar text,
   active boolean not null default true,
@@ -16,7 +16,7 @@ create table if not exists clients (
 );
 
 create table if not exists contracts (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default extensions.uuid_generate_v4(),
   client_id uuid not null references clients(id),
   name text not null,
   monthly_value numeric not null default 0,
@@ -37,7 +37,7 @@ create table if not exists contract_sites (
 );
 
 create table if not exists invoices (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default extensions.uuid_generate_v4(),
   contract_id uuid not null references contracts(id),
   month integer not null check (month between 1 and 12),
   year integer not null,
@@ -68,7 +68,7 @@ create index if not exists invoices_status_idx on invoices (status);
 create index if not exists contracts_client_idx on contracts (client_id);
 
 create table if not exists invoice_deductions (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default extensions.uuid_generate_v4(),
   invoice_id uuid not null references invoices(id) on delete cascade,
   reason text not null default 'other' check (reason in
     ('headcount_shortfall', 'evaluation', 'conduct', 'damages', 'other')),
@@ -85,27 +85,37 @@ alter table contract_sites enable row level security;
 alter table invoices enable row level security;
 alter table invoice_deductions enable row level security;
 
+drop policy if exists "authenticated read clients" on clients;
 create policy "authenticated read clients" on clients
   for select using (auth.role() = 'authenticated');
+drop policy if exists "authenticated manage clients" on clients;
 create policy "authenticated manage clients" on clients
   for all using (auth.role() = 'authenticated');
 
+drop policy if exists "authenticated read contracts" on contracts;
 create policy "authenticated read contracts" on contracts
   for select using (auth.role() = 'authenticated');
+drop policy if exists "authenticated manage contracts" on contracts;
 create policy "authenticated manage contracts" on contracts
   for all using (auth.role() = 'authenticated');
 
+drop policy if exists "authenticated read contract_sites" on contract_sites;
 create policy "authenticated read contract_sites" on contract_sites
   for select using (auth.role() = 'authenticated');
+drop policy if exists "authenticated manage contract_sites" on contract_sites;
 create policy "authenticated manage contract_sites" on contract_sites
   for all using (auth.role() = 'authenticated');
 
+drop policy if exists "authenticated read invoices" on invoices;
 create policy "authenticated read invoices" on invoices
   for select using (auth.role() = 'authenticated');
+drop policy if exists "authenticated manage invoices" on invoices;
 create policy "authenticated manage invoices" on invoices
   for all using (auth.role() = 'authenticated');
 
+drop policy if exists "authenticated read invoice_deductions" on invoice_deductions;
 create policy "authenticated read invoice_deductions" on invoice_deductions
   for select using (auth.role() = 'authenticated');
+drop policy if exists "authenticated manage invoice_deductions" on invoice_deductions;
 create policy "authenticated manage invoice_deductions" on invoice_deductions
   for all using (auth.role() = 'authenticated');

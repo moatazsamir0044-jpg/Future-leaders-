@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { q } from '@/lib/supabase/query'
 import Link from 'next/link'
 import { resolvePeriod } from '@/lib/period'
 import { formatCurrency, formatMonthYear } from '@/lib/utils'
@@ -19,15 +20,15 @@ export default async function InvoicesPage({ searchParams }: { searchParams: Pro
   const typeFilter = params.type || null
 
   const [{ data: invoices }, { data: contracts }, { data: sites }] = await Promise.all([
-    supabase.from('invoices')
+    q(supabase.from('invoices')
       .select('*, contract:contracts(id, name, monthly_value, client:clients(id, name), contract_sites(site_id, site:sites(id, service_type)))')
       .eq('month', month).eq('year', year)
-      .order('created_at', { ascending: false }),
-    supabase.from('contracts')
+      .order('created_at', { ascending: false }), 'invoices'),
+    q(supabase.from('contracts')
       .select('*, client:clients(id, name)')
       .eq('active', true)
-      .order('name'),
-    supabase.from('sites').select('*').eq('active', true).order('sort_order'),
+      .order('name'), 'contracts'),
+    q(supabase.from('sites').select('*').eq('active', true).order('sort_order'), 'sites'),
   ])
 
   // An invoice matches when its contract covers the selected site / type

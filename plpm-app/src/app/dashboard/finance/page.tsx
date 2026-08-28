@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { q } from '@/lib/supabase/query'
 import Link from 'next/link'
 import { resolvePeriod } from '@/lib/period'
 import { formatCurrency, formatMonthYear } from '@/lib/utils'
@@ -26,23 +27,23 @@ export default async function FinancePage({ searchParams }: { searchParams: Prom
   const [{ data: outstandingRaw }, { data: pipeline }, { data: periodInvoices }, { data: payrolls }, { data: expenses }, { data: sites }] =
     await Promise.all([
       // Issued but not yet collected — the receivables book, across all periods
-      supabase.from('invoices')
+      q(supabase.from('invoices')
         .select('*, contract:contracts(id, name, payment_terms_days, client:clients(id, name), contract_sites(site_id, site:sites(id, service_type)))')
         .in('status', ['issued', 'sent_to_client'])
-        .order('issue_date', { ascending: true }),
-      supabase.from('invoices')
+        .order('issue_date', { ascending: true }), 'outstanding invoices'),
+      q(supabase.from('invoices')
         .select('id, net_amount')
-        .in('status', ['draft', 'agreed', 'sent_to_accountant']),
-      supabase.from('invoices')
+        .in('status', ['draft', 'agreed', 'sent_to_accountant']), 'the invoice pipeline'),
+      q(supabase.from('invoices')
         .select('*, contract:contracts(id, name, client:clients(id, name), contract_sites(site_id, site:sites(id, name, service_type)))')
-        .eq('month', month).eq('year', year),
-      supabase.from('payroll_periods')
+        .eq('month', month).eq('year', year), 'invoices for this period'),
+      q(supabase.from('payroll_periods')
         .select('site_id, total_gross')
-        .eq('month', month).eq('year', year),
-      supabase.from('expense_reports')
+        .eq('month', month).eq('year', year), 'payroll sheets'),
+      q(supabase.from('expense_reports')
         .select('site_id, grand_total')
-        .eq('month', month).eq('year', year),
-      supabase.from('sites').select('*').eq('active', true).order('sort_order'),
+        .eq('month', month).eq('year', year), 'expense reports'),
+      q(supabase.from('sites').select('*').eq('active', true).order('sort_order'), 'sites'),
     ])
 
   // An invoice matches when its contract covers the selected site / type

@@ -9,7 +9,7 @@
 -- with payee recorded per cash payment (contractor / driver / landlord).
 
 create table if not exists worker_advances (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default extensions.uuid_generate_v4(),
   employee_id uuid not null references employees(id),
   advance_type text not null default 'holiday' check (advance_type in ('holiday', 'long_term')),
   amount numeric not null check (amount >= 0),
@@ -24,7 +24,7 @@ create index if not exists worker_advances_employee_idx on worker_advances (empl
 create index if not exists worker_advances_status_idx on worker_advances (status);
 
 create table if not exists advance_repayments (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default extensions.uuid_generate_v4(),
   advance_id uuid not null references worker_advances(id) on delete cascade,
   payroll_period_id uuid references payroll_periods(id) on delete set null,
   month integer not null check (month between 1 and 12),
@@ -39,7 +39,7 @@ create index if not exists advance_repayments_advance_idx on advance_repayments 
 create index if not exists advance_repayments_period_idx on advance_repayments (payroll_period_id);
 
 create table if not exists custody_accounts (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default extensions.uuid_generate_v4(),
   name text not null,
   name_ar text,
   holder text,
@@ -49,7 +49,7 @@ create table if not exists custody_accounts (
 );
 
 create table if not exists custody_transactions (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default extensions.uuid_generate_v4(),
   account_id uuid not null references custody_accounts(id) on delete cascade,
   txn_date date not null default current_date,
   type text not null check (type in ('top_up', 'expense')),
@@ -67,22 +67,30 @@ alter table advance_repayments enable row level security;
 alter table custody_accounts enable row level security;
 alter table custody_transactions enable row level security;
 
+drop policy if exists "authenticated read worker_advances" on worker_advances;
 create policy "authenticated read worker_advances" on worker_advances
   for select using (auth.role() = 'authenticated');
+drop policy if exists "authenticated manage worker_advances" on worker_advances;
 create policy "authenticated manage worker_advances" on worker_advances
   for all using (auth.role() = 'authenticated');
 
+drop policy if exists "authenticated read advance_repayments" on advance_repayments;
 create policy "authenticated read advance_repayments" on advance_repayments
   for select using (auth.role() = 'authenticated');
+drop policy if exists "authenticated manage advance_repayments" on advance_repayments;
 create policy "authenticated manage advance_repayments" on advance_repayments
   for all using (auth.role() = 'authenticated');
 
+drop policy if exists "authenticated read custody_accounts" on custody_accounts;
 create policy "authenticated read custody_accounts" on custody_accounts
   for select using (auth.role() = 'authenticated');
+drop policy if exists "authenticated manage custody_accounts" on custody_accounts;
 create policy "authenticated manage custody_accounts" on custody_accounts
   for all using (auth.role() = 'authenticated');
 
+drop policy if exists "authenticated read custody_transactions" on custody_transactions;
 create policy "authenticated read custody_transactions" on custody_transactions
   for select using (auth.role() = 'authenticated');
+drop policy if exists "authenticated manage custody_transactions" on custody_transactions;
 create policy "authenticated manage custody_transactions" on custody_transactions
   for all using (auth.role() = 'authenticated');

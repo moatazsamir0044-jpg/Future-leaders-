@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { q } from '@/lib/supabase/query'
 import { Card } from '@/components/ui/card'
 import { AdvanceManager } from '@/components/finance/advance-manager'
 import { advanceBalance, advanceDueInstallment } from '@/lib/advances'
@@ -9,10 +10,10 @@ export default async function AdvancesPage() {
   const supabase = await createClient()
 
   const [{ data: advances }, { data: sites }] = await Promise.all([
-    supabase.from('worker_advances')
+    q(supabase.from('worker_advances')
       .select('*, employee:employees(id, name, worker_number, site:sites(id, name)), repayments:advance_repayments(*)')
-      .order('created_at', { ascending: false }),
-    supabase.from('sites').select('*').eq('active', true).order('sort_order'),
+      .order('created_at', { ascending: false }), 'worker advances'),
+    q(supabase.from('sites').select('*').eq('active', true).order('sort_order'), 'sites'),
   ])
 
   const list = (advances ?? []) as WorkerAdvance[]

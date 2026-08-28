@@ -4,6 +4,7 @@ import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { formatCurrency } from '@/lib/utils'
+import { calcPayrollTotals, toNumber } from '@/lib/payroll'
 import { Button } from '@/components/ui/button'
 import { Modal } from '@/components/ui/modal'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
@@ -35,7 +36,12 @@ const FIELDS = [
 ] as const
 
 type FieldKey = typeof FIELDS[number]['key']
-type FormData = { worker_number: string; employee_name: string } & Record<FieldKey, string>
+type FormData = {
+  worker_number: string
+  employee_name: string
+  /** Roster link. Without it the advance ledger cannot match this row to a worker. */
+  employee_id: string
+} & Record<FieldKey, string>
 
 const SECTIONS: { group: string; title: string }[] = [
   { group: 'days', title: 'Days & Attendance' },
@@ -45,7 +51,7 @@ const SECTIONS: { group: string; title: string }[] = [
 ]
 
 const emptyForm = (): FormData => ({
-  worker_number: '', employee_name: '',
+  worker_number: '', employee_name: '', employee_id: '',
   attendance_days: '0', absence_days: '0', net_days: '0',
   monthly_leave_days: '0', annual_leave_days: '0', absence_no_permission: '0',
   holiday_extra_days: '0',
@@ -60,6 +66,7 @@ function recordToForm(r: PayrollRecord): FormData {
   return {
     worker_number: String(r.worker_number ?? ''),
     employee_name: r.employee_name,
+    employee_id: r.employee_id ?? '',
     attendance_days: String(r.attendance_days),
     absence_days: String(r.absence_days),
     net_days: String(r.net_days),
@@ -83,23 +90,22 @@ function recordToForm(r: PayrollRecord): FormData {
   }
 }
 
-const round2 = (x: number) => Math.round(x * 100) / 100
-
-// gross = net_days × daily_wage + holiday extra days × daily_wage
-//         + overtime hours × (daily_wage / 8) − less hours × (daily_wage / 8)
-//         + bonuses + transport allowance
-// net   = gross − advance − insurance − deductions − penalties
+// The formula itself lives in @/lib/payroll so it can be unit tested.
 function calcTotals(form: FormData): { gross: number; net: number } {
-  const n = (k: FieldKey) => parseFloat(form[k]) || 0
-  const hourlyRate = n('daily_wage') / 8
-  const gross = n('net_days') * n('daily_wage')
-    + n('holiday_extra_days') * n('daily_wage')
-    + n('overtime_hours') * hourlyRate
-    - n('less_hours') * hourlyRate
-    + n('bonuses')
-    + n('transportation_amount')
-  const net = gross - n('advance') - n('insurance') - n('deductions') - n('penalties')
-  return { gross: round2(gross), net: round2(net) }
+  const n = (k: FieldKey) => toNumber(form[k])
+  return calcPayrollTotals({
+    net_days: n('net_days'),
+    holiday_extra_days: n('holiday_extra_days'),
+    overtime_hours: n('overtime_hours'),
+    less_hours: n('less_hours'),
+    daily_wage: n('daily_wage'),
+    bonuses: n('bonuses'),
+    transportation_amount: n('transportation_amount'),
+    advance: n('advance'),
+    insurance: n('insurance'),
+    deductions: n('deductions'),
+    penalties: n('penalties'),
+  })
 }
 
 export function PayrollTable({ periodId, records: initialRecords, periodStatus, siteId }: {
@@ -159,7 +165,16 @@ export function PayrollTable({ periodId, records: initialRecords, periodStatus, 
   }
 
   function setField(key: string, value: string) {
-    setForm(f => ({ ...f, [key]: value }))
+    setForm(f => ({
+      ...f,
+      [key]: value,
+      // Typing over a prefilled name means this is a different person, so the
+      // roster link must go with it — otherwise the advance ledger would post
+      // this row's deduction against the worker who was originally selected.
+      ...(key === 'employee_name' && value.trim() !== f.employee_name.trim()
+        ? { employee_id: '' }
+        : {}),
+    }))
   }
 
   function prefillFromRoster(employeeId: string) {
@@ -167,6 +182,7 @@ export function PayrollTable({ periodId, records: initialRecords, periodStatus, 
     if (!emp) return
     setForm(f => ({
       ...f,
+      employee_id: emp.id,
       worker_number: emp.worker_number != null ? String(emp.worker_number) : f.worker_number,
       employee_name: emp.name,
       base_monthly_salary: String(emp.base_monthly_salary),
@@ -183,9 +199,10 @@ export function PayrollTable({ periodId, records: initialRecords, periodStatus, 
     const payload = {
       period_id: periodId,
       site_id: siteId,
-      worker_number: form.worker_number ? parseInt(form.worker_number) : null,
+      employee_id: form.employee_id || null,
+      worker_number: form.worker_number ? Number.parseInt(form.worker_number, 10) : null,
       employee_name: form.employee_name.trim(),
-      ...Object.fromEntries(FIELDS.map(f => [f.key, parseFloat(form[f.key]) || 0])),
+      ...Object.fromEntries(FIELDS.map(f => [f.key, toNumber(form[f.key])])),
       ...(autoCalc ? { total_gross: calc.gross, net_salary: calc.net } : {}),
     }
     let result
@@ -196,16 +213,13 @@ export function PayrollTable({ periodId, records: initialRecords, periodStatus, 
     }
     if (result.error) { setError(result.error.message); setSaving(false); return }
 
-    // Recalculate totals
+    // Sheet totals are derived in the database from these records, so there is
+    // nothing to write back here; router.refresh() below picks up the new figures.
     const updated = editRecord
       ? records.map(r => r.id === editRecord.id ? result.data : r)
       : [...records, result.data]
     setRecords(updated)
     setTableError('')
-    const totalGross = updated.reduce((s: number, r: PayrollRecord) => s + Number(r.total_gross), 0)
-    const totalNet = updated.reduce((s: number, r: PayrollRecord) => s + Number(r.net_salary), 0)
-    const { error: totalsErr } = await supabase.from('payroll_periods').update({ total_gross: totalGross, total_net: totalNet }).eq('id', periodId)
-    if (totalsErr) setTableError(`Record saved, but sheet totals could not be updated: ${totalsErr.message}`)
 
     toast(editRecord ? `Updated record for ${payload.employee_name}` : `Added ${payload.employee_name} to the sheet`)
     setSaving(false)
@@ -225,12 +239,7 @@ export function PayrollTable({ periodId, records: initialRecords, periodStatus, 
       toast(`Could not delete ${r.employee_name}`, 'error')
       return
     }
-    const updated = records.filter(rec => rec.id !== r.id)
-    setRecords(updated)
-    const totalGross = updated.reduce((s: number, rec: PayrollRecord) => s + Number(rec.total_gross), 0)
-    const totalNet = updated.reduce((s: number, rec: PayrollRecord) => s + Number(rec.net_salary), 0)
-    const { error: totalsErr } = await supabase.from('payroll_periods').update({ total_gross: totalGross, total_net: totalNet }).eq('id', periodId)
-    if (totalsErr) setTableError(`Record deleted, but sheet totals could not be updated: ${totalsErr.message}`)
+    setRecords(records.filter(rec => rec.id !== r.id))
     toast(`Deleted record for ${r.employee_name}`)
     setDeleting(false)
     setDeleteTarget(null)

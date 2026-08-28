@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { q } from '@/lib/supabase/query'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { ClientManager } from '@/components/finance/client-manager'
 import { ContractManager } from '@/components/finance/contract-manager'
@@ -8,11 +9,11 @@ export default async function ClientsPage() {
   const supabase = await createClient()
 
   const [{ data: clients }, { data: contracts }, { data: sites }] = await Promise.all([
-    supabase.from('clients').select('*').order('name'),
-    supabase.from('contracts')
+    q(supabase.from('clients').select('*').order('name'), 'clients'),
+    q(supabase.from('contracts')
       .select('*, client:clients(id, name, name_ar), contract_sites(site_id, site:sites(id, name))')
-      .order('name'),
-    supabase.from('sites').select('*').eq('active', true).order('sort_order'),
+      .order('name'), 'contracts'),
+    q(supabase.from('sites').select('*').eq('active', true).order('sort_order'), 'sites'),
   ])
 
   return (

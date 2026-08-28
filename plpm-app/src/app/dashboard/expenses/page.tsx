@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { q } from '@/lib/supabase/query'
 import Link from 'next/link'
 import { resolvePeriod } from '@/lib/period'
 import { formatCurrency, formatMonthYear } from '@/lib/utils'
@@ -18,11 +19,11 @@ export default async function ExpensesPage({ searchParams }: { searchParams: Pro
   const typeFilter = params.type || null
 
   const [{ data: allReports }, { data: sites }] = await Promise.all([
-    supabase.from('expense_reports')
+    q(supabase.from('expense_reports')
       .select('*, site:sites(id, name, service_type, client_name)')
       .eq('month', month).eq('year', year)
-      .order('created_at', { ascending: false }),
-    supabase.from('sites').select('*').eq('active', true).order('sort_order'),
+      .order('created_at', { ascending: false }), 'expense reports'),
+    q(supabase.from('sites').select('*').eq('active', true).order('sort_order'), 'sites'),
   ])
 
   const reports = (allReports ?? []).filter(r => {

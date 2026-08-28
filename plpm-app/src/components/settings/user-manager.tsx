@@ -8,7 +8,10 @@ import { useToast } from '@/components/ui/toast'
 import { Pencil, UserPlus } from 'lucide-react'
 import type { UserProfile, UserRole } from '@/types'
 
-export function UserManager({ profiles: initial }: { profiles: UserProfile[] }) {
+export function UserManager({ profiles: initial, currentUserId }: {
+  profiles: UserProfile[]
+  currentUserId: string | null
+}) {
   const [profiles, setProfiles] = useState(initial)
   const [open, setOpen] = useState(false)
   const [editing, setEditing] = useState<UserProfile | null>(null)
@@ -31,10 +34,20 @@ export function UserManager({ profiles: initial }: { profiles: UserProfile[] }) 
     setOpen(true)
   }
 
+  const adminCount = profiles.filter(p => p.role === 'admin').length
+
   async function handleSave() {
     if (!form.full_name.trim()) { setError('Name is required'); return }
 
     if (editing) {
+      if (editing.role === 'admin' && form.role !== 'admin' && adminCount <= 1) {
+        setError('This is the only admin. Promote someone else before changing this role.')
+        return
+      }
+      if (editing.id === currentUserId && editing.role === 'admin' && form.role !== 'admin') {
+        setError('You cannot remove your own admin role — ask another admin to do it.')
+        return
+      }
       setSaving(true); setError('')
       const supabase = createClient()
       const { error: err } = await supabase

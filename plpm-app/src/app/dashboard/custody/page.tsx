@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { q } from '@/lib/supabase/query'
 import { CustodyManager } from '@/components/finance/custody-manager'
 import type { CustodyAccount, CustodyTransaction } from '@/types'
 
@@ -6,11 +7,11 @@ export default async function CustodyPage() {
   const supabase = await createClient()
 
   const [{ data: accounts }, { data: transactions }] = await Promise.all([
-    supabase.from('custody_accounts').select('*').order('created_at'),
-    supabase.from('custody_transactions')
+    q(supabase.from('custody_accounts').select('*').order('created_at'), 'custody accounts'),
+    q(supabase.from('custody_transactions')
       .select('*, account:custody_accounts(id, name)')
       .order('txn_date', { ascending: false })
-      .order('created_at', { ascending: false }),
+      .order('created_at', { ascending: false }), 'custody transactions'),
   ])
 
   return (

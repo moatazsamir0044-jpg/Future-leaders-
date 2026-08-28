@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { q, qMaybe } from '@/lib/supabase/query'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { formatMonthYear } from '@/lib/utils'
@@ -12,10 +13,10 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
   const supabase = await createClient()
 
   const [{ data: invoice }, { data: deductions }] = await Promise.all([
-    supabase.from('invoices')
+    qMaybe(supabase.from('invoices')
       .select('*, contract:contracts(*, client:clients(id, name, name_ar), contract_sites(site_id, site:sites(id, name)))')
-      .eq('id', id).single(),
-    supabase.from('invoice_deductions').select('*').eq('invoice_id', id).order('sort_order'),
+      .eq('id', id).single(), 'this invoice'),
+    q(supabase.from('invoice_deductions').select('*').eq('invoice_id', id).order('sort_order'), 'invoice deductions'),
   ])
 
   if (!invoice) notFound()

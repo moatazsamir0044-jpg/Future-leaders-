@@ -4,7 +4,7 @@
 -- active roster (shortfall flags) and payroll/expense actuals vs budget.
 
 create table if not exists site_budgets (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default extensions.uuid_generate_v4(),
   site_id uuid not null references sites(id),
   month integer not null check (month between 1 and 12),
   year integer not null,
@@ -20,7 +20,9 @@ create index if not exists site_budgets_period_idx on site_budgets (year, month)
 
 alter table site_budgets enable row level security;
 
+drop policy if exists "authenticated read site_budgets" on site_budgets;
 create policy "authenticated read site_budgets" on site_budgets
   for select using (auth.role() = 'authenticated');
+drop policy if exists "authenticated manage site_budgets" on site_budgets;
 create policy "authenticated manage site_budgets" on site_budgets
   for all using (auth.role() = 'authenticated');

@@ -1,6 +1,7 @@
 export const dynamic = 'force-dynamic'
 
 import { createClient } from '@/lib/supabase/server'
+import { q } from '@/lib/supabase/query'
 import Link from 'next/link'
 import { resolvePeriod } from '@/lib/period'
 import { formatCurrency, formatMonthYear } from '@/lib/utils'
@@ -8,7 +9,7 @@ import { StatusBadge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { DashboardCharts } from '@/components/dashboard/charts'
 import { DashboardFilters } from '@/components/dashboard/filters'
-import { FileText, Receipt, CheckSquare, AlertCircle, TrendingUp, Building2 } from 'lucide-react'
+import { FileText, Receipt, CheckSquare, TrendingUp } from 'lucide-react'
 
 interface SearchParams { month?: string; year?: string; site?: string; type?: string; status?: string }
 
@@ -28,17 +29,17 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
     { data: pendingPayroll },
     { data: pendingExpenses },
   ] = await Promise.all([
-    supabase.from('sites').select('*').eq('active', true).order('sort_order'),
-    supabase.from('payroll_periods')
+    q(supabase.from('sites').select('*').eq('active', true).order('sort_order'), 'sites'),
+    q(supabase.from('payroll_periods')
       .select('*, site:sites(name, service_type)')
       .eq('month', month).eq('year', year)
-      .order('created_at', { ascending: false }),
-    supabase.from('expense_reports')
+      .order('created_at', { ascending: false }), 'payroll sheets'),
+    q(supabase.from('expense_reports')
       .select('*, site:sites(name, service_type)')
       .eq('month', month).eq('year', year)
-      .order('created_at', { ascending: false }),
-    supabase.from('payroll_periods').select('id').eq('status', 'submitted'),
-    supabase.from('expense_reports').select('id').eq('status', 'submitted'),
+      .order('created_at', { ascending: false }), 'expense reports'),
+    q(supabase.from('payroll_periods').select('id').eq('status', 'submitted'), 'pending payroll'),
+    q(supabase.from('expense_reports').select('id').eq('status', 'submitted'), 'pending expenses'),
   ])
 
   const bySiteFilter = (row: { site_id: string; site: unknown }) => {

@@ -43,7 +43,7 @@ export function ExpenseActions({ report, transportation, accommodation, items, s
   async function updateStatus(newStatus: WorkflowStatus, notes?: string) {
     setLoading(newStatus)
     setActionError('')
-    const err = await updateApprovalStatus('expense', report.id, newStatus, notes)
+    const err = await updateApprovalStatus('expense', report.id, newStatus, notes, status as WorkflowStatus)
     if (err) {
       setActionError(`Could not update status: ${err}`)
       toast('Status update failed', 'error')
