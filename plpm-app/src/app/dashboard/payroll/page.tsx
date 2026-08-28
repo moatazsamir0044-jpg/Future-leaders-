@@ -6,7 +6,7 @@ import { StatusBadge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { DashboardFilters } from '@/components/dashboard/filters'
 import { NewPayrollButton } from '@/components/payroll/new-payroll-button'
-import { FileText } from 'lucide-react'
+import { FileText, Upload } from 'lucide-react'
 
 interface SearchParams { month?: string; year?: string; site?: string; type?: string }
 
@@ -44,6 +44,12 @@ export default async function PayrollPage({ searchParams }: { searchParams: Prom
         <div className="flex items-center gap-3">
           <DashboardFilters currentMonth={month} currentYear={year}
             sites={sites ?? []} currentSite={siteFilter ?? undefined} currentType={typeFilter ?? undefined} />
+          <Link
+            href={`/dashboard/payroll/import?month=${month}&year=${year}`}
+            className="inline-flex items-center justify-center gap-2 h-9 px-4 text-sm font-medium rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 transition-colors"
+          >
+            <Upload className="h-4 w-4" /> Import from Excel
+          </Link>
           <NewPayrollButton sites={sites ?? []} month={month} year={year} />
         </div>
       </div>

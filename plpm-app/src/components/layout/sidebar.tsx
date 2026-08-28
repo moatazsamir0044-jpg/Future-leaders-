@@ -7,7 +7,7 @@ import { cn } from '@/lib/utils'
 import {
   LayoutDashboard, Users, FileText, Receipt, Banknote, ScrollText, Briefcase,
   HandCoins, Wallet, Sunrise, FileSpreadsheet, CheckSquare, Settings, LogOut,
-  Building2, Menu, X
+  Building2, Menu, X, Upload
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 
@@ -15,6 +15,7 @@ const nav = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/dashboard/morning', label: 'Morning Report', icon: Sunrise },
   { href: '/dashboard/payroll', label: 'Payroll', icon: FileText },
+  { href: '/dashboard/payroll/import', label: 'Import Payroll', icon: Upload },
   { href: '/dashboard/expenses', label: 'Expenses', icon: Receipt },
   { href: '/dashboard/invoices', label: 'Invoices', icon: ScrollText },
   { href: '/dashboard/finance', label: 'Receivables', icon: Banknote },

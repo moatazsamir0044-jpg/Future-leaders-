@@ -21,6 +21,12 @@ export interface Site {
   active: boolean
   sort_order: number
   created_at: string
+  /**
+   * The site's tab name in the monthly payroll workbook, used to match a
+   * worksheet to this site on import. Unique (case- and space-insensitive)
+   * across sites; null for sites that have no sheet of their own.
+   */
+  sheet_key: string | null
 }
 
 export interface Employee {
