@@ -21,17 +21,12 @@ export default async function ApprovalsPage({ searchParams }: { searchParams: Pr
   const [
     { data: { user } },
     { data: pendingPayroll },
-    { data: pendingExpenses },
   ] = await Promise.all([
     supabase.auth.getUser(),
     q(supabase.from('payroll_periods')
       .select('*, site:sites(name, service_type, client_name)')
       .eq('status', 'submitted')
       .order('year').order('month').order('submitted_at', { ascending: true, nullsFirst: true }), 'pending payroll sheets'),
-    q(supabase.from('expense_reports')
-      .select('*, site:sites(name, service_type, client_name)')
-      .eq('status', 'submitted')
-      .order('year').order('month').order('submitted_at', { ascending: true, nullsFirst: true }), 'pending expense reports'),
   ])
 
   const { data: profile } = user
@@ -44,29 +39,19 @@ export default async function ApprovalsPage({ searchParams }: { searchParams: Pr
   let month = 0
   let year = 0
   let historyPayroll: ApprovalRow[] = []
-  let historyExpenses: ApprovalRow[] = []
   if (view === 'history') {
     const resolved = await resolvePeriod(supabase, params)
     month = resolved.month
     year = resolved.year
-    const [{ data: hp }, { data: he }] = await Promise.all([
-      q(supabase.from('payroll_periods')
-        .select('*, site:sites(name, service_type, client_name)')
-        .eq('month', month).eq('year', year)
-        .in('status', ['submitted', 'approved', 'rejected'])
-        .order('created_at', { ascending: false }), 'payroll approval history'),
-      q(supabase.from('expense_reports')
-        .select('*, site:sites(name, service_type, client_name)')
-        .eq('month', month).eq('year', year)
-        .in('status', ['submitted', 'approved', 'rejected'])
-        .order('created_at', { ascending: false }), 'expense approval history'),
-    ])
+    const { data: hp } = await q(supabase.from('payroll_periods')
+      .select('*, site:sites(name, service_type, client_name)')
+      .eq('month', month).eq('year', year)
+      .in('status', ['submitted', 'approved', 'rejected'])
+      .order('created_at', { ascending: false }), 'payroll approval history')
     historyPayroll = hp ?? []
-    historyExpenses = he ?? []
   }
 
   const nPendingPayroll = (pendingPayroll ?? []).length
-  const nPendingExpenses = (pendingExpenses ?? []).length
 
   return (
     <div className="p-6 space-y-6">
@@ -74,7 +59,7 @@ export default async function ApprovalsPage({ searchParams }: { searchParams: Pr
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Approvals</h1>
           <p className="text-sm text-gray-500 mt-0.5">
-            {view === 'pending' ? 'Everything waiting for a decision, across all months' : `History — ${formatMonthYear(month, year)}`}
+            {view === 'pending' ? 'Payroll sheets waiting for a decision, across all months' : `History — ${formatMonthYear(month, year)}`}
           </p>
         </div>
         <div className="flex items-center gap-3 flex-wrap">
@@ -84,7 +69,7 @@ export default async function ApprovalsPage({ searchParams }: { searchParams: Pr
               href="/dashboard/approvals"
               className={cn('px-3 py-1.5 rounded-md transition-colors', view === 'pending' ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-50')}
             >
-              Pending{nPendingPayroll + nPendingExpenses > 0 ? ` (${nPendingPayroll + nPendingExpenses})` : ''}
+              Pending{nPendingPayroll > 0 ? ` (${nPendingPayroll})` : ''}
             </Link>
             <Link
               href={view === 'history' ? `/dashboard/approvals?view=history&month=${month}&year=${year}` : '/dashboard/approvals?view=history'}
@@ -97,70 +82,33 @@ export default async function ApprovalsPage({ searchParams }: { searchParams: Pr
         </div>
       </div>
 
-      {/* Counters — always all-months pending, matching the dashboard KPI */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        {[
-          { label: 'Pending Payroll', value: String(nPendingPayroll), color: 'text-amber-600' },
-          { label: 'Pending Expenses', value: String(nPendingExpenses), color: 'text-amber-600' },
-          { label: 'Total Pending', value: String(nPendingPayroll + nPendingExpenses), color: nPendingPayroll + nPendingExpenses > 0 ? 'text-red-600' : 'text-green-600' },
-        ].map(({ label, value, color }) => (
-          <Card key={label} className="p-4">
-            <p className="text-xs text-gray-500 uppercase tracking-wide">{label}</p>
-            <p className={`text-2xl font-bold mt-1 ${color}`}>{value}</p>
-          </Card>
-        ))}
-      </div>
-
       {view === 'pending' ? (
-        <>
-          <PendingTable
-            title="Payroll Sheets"
-            entity="payroll"
-            rows={pendingPayroll ?? []}
-            isAdmin={isAdmin}
-            hrefBase="/dashboard/payroll"
-            amountLabel="Net Total"
-            amountKey="total_net"
-            accent="text-blue-600"
-          />
-          <PendingTable
-            title="Expense Reports"
-            entity="expense"
-            rows={pendingExpenses ?? []}
-            isAdmin={isAdmin}
-            hrefBase="/dashboard/expenses"
-            amountLabel="Grand Total"
-            amountKey="grand_total"
-            accent="text-purple-600"
-          />
-        </>
+        <PendingTable
+          title="Payroll Sheets"
+          entity="payroll"
+          rows={pendingPayroll ?? []}
+          isAdmin={isAdmin}
+          hrefBase="/dashboard/payroll"
+          amountLabel="Net Total"
+          amountKey="total_net"
+          accent="text-blue-600"
+        />
       ) : (
-        <>
-          <HistoryTable
-            title="Payroll Sheets"
-            rows={historyPayroll}
-            hrefBase="/dashboard/payroll"
-            amountLabel="Net Total"
-            amountKey="total_net"
-            accent="text-blue-600"
-            emptyText="No payroll submissions this month"
-          />
-          <HistoryTable
-            title="Expense Reports"
-            rows={historyExpenses}
-            hrefBase="/dashboard/expenses"
-            amountLabel="Grand Total"
-            amountKey="grand_total"
-            accent="text-purple-600"
-            emptyText="No expense submissions this month"
-          />
-        </>
+        <HistoryTable
+          title="Payroll Sheets"
+          rows={historyPayroll}
+          hrefBase="/dashboard/payroll"
+          amountLabel="Net Total"
+          amountKey="total_net"
+          accent="text-blue-600"
+          emptyText="No payroll submissions this month"
+        />
       )}
     </div>
   )
 }
 
-/* Row shape shared by both tables (subset of payroll_periods / expense_reports) */
+/* Row shape shared by the pending and history tables (subset of payroll_periods) */
 interface ApprovalRow {
   id: string
   month: number

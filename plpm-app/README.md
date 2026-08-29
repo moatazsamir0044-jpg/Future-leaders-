@@ -1,11 +1,30 @@
-# PLPM — Professional Leaders operations platform
+# PLPM — Professional Leaders payroll
 
-Internal system for a facility-management contractor in Egypt: monthly payroll
-sheets per site, site expense reports, client invoicing and receivables, a
-worker advance ledger, cash custody (العهدة), and the monthly handoff pack for
-the external accountant.
+Internal payroll system for a facility-management contractor in Egypt: monthly
+payroll sheets per site, the employee roster they draw on, the submit/approve
+workflow, and the monthly handoff pack for the external accountant.
 
 Next.js 16 (App Router) with Supabase for auth and Postgres.
+
+## Scope
+
+This started as a broader operations platform. It was narrowed to payroll: the
+site expense reports, client invoicing, receivables, worker advance ledger and
+cash custody (العهدة) screens were removed from the application.
+
+**Their database tables were deliberately left in place.** Nothing was dropped
+and no row was deleted — the schema still holds the invoice, expense, advance
+and custody history, and the accountant export still reads it, so a month that
+already has that data still exports completely. Restoring any of those screens
+is a `git revert` of the commit that removed them, not a rebuild.
+
+Two consequences worth knowing:
+
+- Expense reports left in `submitted` are no longer reachable from the
+  Approvals screen. They keep their status; nothing new can be submitted.
+- The advance ledger still runs underneath payroll. Approving a sheet records
+  its advance deductions as repayments exactly as before — only the ledger's
+  own screen is gone.
 
 ## Running locally
 
