@@ -33,8 +33,10 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: [
-    // Run on all paths except static assets and image files.
-    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)',
-  ],
+  // Only the routes that read the session. The refresh above is a network
+  // round trip to Supabase Auth, so running it on the signed-out pages, on
+  // static assets, or on prefetches spent that trip for nothing — and this
+  // app's functions and its database are far enough apart that the trip is
+  // not cheap.
+  matcher: ['/dashboard/:path*', '/api/:path*'],
 }
