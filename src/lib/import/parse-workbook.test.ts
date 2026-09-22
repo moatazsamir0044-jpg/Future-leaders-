@@ -206,3 +206,68 @@ describe('parseWorkbook', () => {
     expect(futtaimWarning?.message).toMatch(/does not match/)
   })
 })
+
+describe('parseWorkbook — subtotal amount recovery', () => {
+  // Confirmed by direct inspection of both real zone workbooks (منطقة
+  // اكتوبر and التجمع, several sites in each): a subtotal row consistently
+  // writes its net value immediately before a "صافى"/"الصافى" label cell,
+  // and its gross value immediately before an "اجمالى"/"الاجمالى" label
+  // cell — in whichever physical columns were free that row, not the
+  // sheet's own worker-row header columns.
+  async function buildSubtotalPatternWorkbook(): Promise<Buffer> {
+    const workbook = new ExcelJS.Workbook()
+    const site = workbook.addWorksheet('SiteX')
+    // A realistically wide header row (the real files run ~24 columns) —
+    // this matters here, not just for realism: row-classifier only scans
+    // text within the header-declared columns (see otherRowTexts in
+    // parse-workbook.ts), so a label cell has to fall inside that range
+    // for the row to be classified 'subtotal' at all, same as in the
+    // real files.
+    setRow(site, 1, [
+      'رقم', 'الاسم', 'الراتب الشهرى', 'الاجمالى', 'مكافاءت',
+      'مواصلات', 'فئة المواصلات', 'سلف', 'استقطاعات',
+    ])
+    setRow(site, 2, ['1', 'محمد', 3000, 3200])
+    // Confirmed real pattern: the row's own description sits in the
+    // sheet's own "الاسم" column (picked up by the normal column mapping,
+    // same as any worker row's name), while the actual net/gross amounts
+    // sit in unrelated columns the accountant used as scratch space —
+    // found by their own adjacent صافى/اجمالى label text, not by column
+    // position or header meaning. Column D (الاجمالى, the *header-mapped*
+    // gross column) is deliberately left empty to prove extraction
+    // doesn't depend on it.
+    const subtotalRow = site.getRow(3)
+    subtotalRow.getCell(2).value = 'مواصلات صباحى' // الاسم — normal-mapped
+    subtotalRow.getCell(6).value = 9850.5 // مواصلات column, repurposed
+    subtotalRow.getCell(7).value = 'صافى' // فئة المواصلات column, repurposed
+    subtotalRow.getCell(8).value = 10200.75 // سلف column, repurposed
+    subtotalRow.getCell(9).value = 'اجمالى' // استقطاعات column, repurposed
+    setRow(site, 4, ['اجماليات', '', '', 13200])
+
+    const buffer = await workbook.xlsx.writeBuffer()
+    return Buffer.from(buffer)
+  }
+
+  it('recovers net/gross for a subtotal row from its own adjacent صافى/اجمالى labels, regardless of column position', async () => {
+    const result = await parseWorkbook(await buildSubtotalPatternWorkbook())
+    const site = sheetByName(result, 'SiteX')
+    const subtotal = site.rows.find((r) => r.rowKind === 'subtotal')!
+
+    expect(subtotal.workerName).toBe('مواصلات صباحى')
+    expect(subtotal.netSalary).toBe(9850.5)
+    expect(subtotal.totalGross).toBe(10200.75)
+    // Still not asserted: fields with no reliable source on a freeform row.
+    expect(subtotal.attendanceDays).toBeNull()
+    expect(subtotal.baseMonthlySalary).toBeNull()
+  })
+
+  it('leaves net/gross null when a subtotal row has no صافى/اجمالى label to recover from', async () => {
+    const result = await parseWorkbook(await buildFixtureWorkbook())
+    const siteA = sheetByName(result, 'SiteA')
+    const subtotal = siteA.rows.find((r) => r.sourceRowNumber === 7)!
+
+    expect(subtotal.rowKind).toBe('subtotal')
+    expect(subtotal.netSalary).toBeNull()
+    expect(subtotal.totalGross).toBeNull()
+  })
+})

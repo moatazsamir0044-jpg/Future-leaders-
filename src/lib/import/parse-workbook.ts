@@ -228,28 +228,82 @@ function parseDataRow(
   })
 
   if (line.rowKind === 'subtotal') {
+    const amounts = extractSubtotalAmounts(worksheet, rowNumber)
     clearMappedFieldsForFreeformRow(line)
+    line.netSalary = amounts.netSalary
+    line.totalGross = amounts.totalGross
   }
 
   return line
 }
 
+const SUBTOTAL_NET_LABELS = new Set(['صافى', 'الصافى'].map(normalizeForCompare))
+const SUBTOTAL_GROSS_LABELS = new Set(['اجمالى', 'الاجمالى'].map(normalizeForCompare))
+
+/**
+ * Confirmed across both real zone workbooks (منطقة اكتوبر and التجمع,
+ * multiple sites in each — not a one-off): a subtotal row consistently
+ * writes "<net value> <label "صافى"/"الصافى"> <gross value> <label
+ * "اجمالى"/"الاجمالى"> <description>" across whichever physically adjacent
+ * columns happened to be free — not the worker-row header columns (see
+ * clearMappedFieldsForFreeformRow's own comment for why those aren't
+ * trustworthy). Recovers the two real amounts by finding each label text
+ * and reading the cell immediately to its left, regardless of which
+ * column that physically is — not by the sheet's header-declared column
+ * for total_gross/net_salary, which is what corrupted these fields
+ * originally.
+ *
+ * Scans the row's full physical width (not just the header-declared
+ * columns): in the real files the label cells always land within that
+ * range, since the header row itself is wide (~24 columns), but a
+ * narrower sheet could in principle put one past the last header, and
+ * there is no reason to miss a real, findable label over that. Returns
+ * nulls (never guesses) when the pattern isn't found, e.g. a subtotal row
+ * with no recoverable amount at all.
+ */
+function extractSubtotalAmounts(
+  worksheet: WorksheetLike,
+  rowNumber: number,
+): { netSalary: number | null; totalGross: number | null } {
+  const row = worksheet.getRow(rowNumber)
+  let netSalary: number | null = null
+  let totalGross: number | null = null
+
+  for (let col = 1; col <= row.cellCount; col++) {
+    const cellText = normalizeForCompare(coerceText(row.getCell(col).value))
+    if (!cellText) continue
+
+    const precedingValue = () => (col > 1 ? coerceNumber(row.getCell(col - 1).value) : null)
+    if (SUBTOTAL_NET_LABELS.has(cellText)) {
+      const value = precedingValue()
+      if (value !== null) netSalary = value
+    }
+    if (SUBTOTAL_GROSS_LABELS.has(cellText)) {
+      const value = precedingValue()
+      if (value !== null) totalGross = value
+    }
+  }
+
+  return { netSalary, totalGross }
+}
+
 /**
  * Confirmed by direct inspection of the real files: a subtotal row (e.g. a
- * "supervision & admin staff" running total, or a group subtotal by
- * worker's home governorate) does not follow the worker-row column grid at
- * all — it's a label/value pair the accountant free-typed wherever there
- * was room, not aligned to the sheet's own header columns. Reading it
- * through the normal per-column field mapping (correct for every other row
- * kind) lands arbitrary fragments of that freeform content into fields
- * that assert a specific meaning — e.g. a stray number ending up under
- * `overtimeHours` when it is actually that row's own subtotal amount,
- * mislabeled. There is no reliable column to recover the real amount from
- * (which one varies sheet to sheet), so rather than show a number that
- * looks precise but means something else, every mapped field is cleared
- * except the row's own label (kept as workerName) and identifying
- * metadata. raw_row is untouched — the true content of every cell in this
- * row stays fully inspectable there, just not asserted as structured data.
+ * transport-shift or supervision-staff group total) does not follow the
+ * worker-row column grid at all — it's a label/value pair the accountant
+ * free-typed wherever there was room, not aligned to the sheet's own
+ * header columns. Reading it through the normal per-column field mapping
+ * (correct for every other row kind) lands arbitrary fragments of that
+ * freeform content into fields that assert a specific meaning — e.g. a
+ * stray number ending up under `overtimeHours` when it is actually that
+ * row's own subtotal amount, mislabeled. None of the header-mapped fields
+ * are trustworthy for a row like this, so every one of them is cleared
+ * except the row's own label (kept as workerName). The two amounts that
+ * genuinely matter — net and gross — are instead recovered separately by
+ * `extractSubtotalAmounts`, which finds them by their own adjacent label
+ * text rather than by column position (see its comment), and are set by
+ * the caller after this runs. raw_row is untouched either way — the true
+ * content of every cell in this row stays fully inspectable there.
  */
 function clearMappedFieldsForFreeformRow(line: ParsedPayrollLine): void {
   line.workerNumber = null
