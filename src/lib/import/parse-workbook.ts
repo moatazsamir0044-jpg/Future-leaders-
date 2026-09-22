@@ -8,8 +8,11 @@ import { normalizeForCompare } from './normalize-arabic'
 import {
   buildSheetWarnings,
   countRowsByKind,
+  crossCheckAmount,
   crossCheckSheetTotal,
   extractTotalsTabFigures,
+  extractWorkbookGrandTotal,
+  sumField,
   sumTotalGross,
 } from './validate'
 import type {
@@ -93,6 +96,23 @@ export async function parseWorkbook(buffer: Buffer | ArrayBuffer): Promise<Parse
     sheets.push(result)
     for (const message of result.warnings) {
       warnings.push({ sheetName: worksheet.name, message })
+    }
+  }
+
+  if (totalsWorksheet) {
+    const grandTotal = extractWorkbookGrandTotal(totalsWorksheet)
+    if (grandTotal) {
+      const allRows = sheets.flatMap((sheet) => sheet.rows)
+      const checks: Array<[label: string, field: 'totalGross' | 'insurance' | 'deductions' | 'advance', expected: number | null]> = [
+        ['total_gross', 'totalGross', grandTotal.gross],
+        ['insurance', 'insurance', grandTotal.insurance],
+        ['deductions', 'deductions', grandTotal.deductions],
+        ['advance', 'advance', grandTotal.advance],
+      ]
+      for (const [label, field, expected] of checks) {
+        const message = crossCheckAmount(label, sumField(allRows, field), expected)
+        if (message) warnings.push({ sheetName: '(workbook total)', message })
+      }
     }
   }
 

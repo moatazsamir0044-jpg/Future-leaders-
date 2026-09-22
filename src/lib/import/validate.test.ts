@@ -2,8 +2,11 @@ import { describe, expect, it } from 'vitest'
 import {
   buildSheetWarnings,
   countRowsByKind,
+  crossCheckAmount,
   crossCheckSheetTotal,
   extractTotalsTabFigures,
+  extractWorkbookGrandTotal,
+  sumField,
   sumTotalGross,
 } from './validate'
 import type { WorksheetLike } from './header-detection'
@@ -180,5 +183,64 @@ describe('extractTotalsTabFigures', () => {
   it('returns an empty map when no header row is found', () => {
     const ws = makeWorksheet([['no headers here']])
     expect(extractTotalsTabFigures(ws).size).toBe(0)
+  })
+})
+
+describe('sumField', () => {
+  it('sums the given field across worker/non_worker_cost rows only', () => {
+    const total = sumField(
+      [
+        line({ rowKind: 'worker', advance: 1000 }),
+        line({ rowKind: 'non_worker_cost', advance: 500 }),
+        line({ rowKind: 'subtotal', advance: 9999 }), // excluded, would double-count
+        line({ rowKind: 'unknown', advance: 9999 }), // excluded, unclassified
+      ],
+      'advance',
+    )
+    expect(total).toBe(1500)
+  })
+
+  it('treats a null value as 0', () => {
+    expect(sumField([line({ rowKind: 'worker', advance: null })], 'advance')).toBe(0)
+  })
+})
+
+describe('crossCheckAmount', () => {
+  it('names the field in the warning message', () => {
+    expect(crossCheckAmount('advance', 1000, 5000)).toMatch(/Computed advance/)
+  })
+
+  it('returns no warning within tolerance or with nothing to compare against', () => {
+    expect(crossCheckAmount('advance', 1000, 1000.5)).toBeNull()
+    expect(crossCheckAmount('advance', 1000, null)).toBeNull()
+  })
+})
+
+describe('extractWorkbookGrandTotal', () => {
+  // Confirmed real shape (both zone workbooks): the Total tab's own
+  // grand-total row is labeled "الاجمالى" in its own name column — same
+  // token as every per-site row's gross-total column header, just used as
+  // a row label here instead.
+  it('finds the row whose own label is اجمالي/الاجمالى and reads all four columns off it', () => {
+    const ws = makeWorksheet([
+      ['الموقع', 'اجمالى', 'تامينات', 'استقطاعات', 'سلف'],
+      ['موقع أ', 50000, 1000, 0, 2000],
+      ['موقع ب', 30000, 500, 0, 1000],
+      ['الاجمالى', 80000, 1500, 0, 3000],
+    ])
+    const grandTotal = extractWorkbookGrandTotal(ws)
+    expect(grandTotal).toEqual({ gross: 80000, insurance: 1500, deductions: 0, advance: 3000 })
+  })
+
+  it('returns null when there is no grand-total row at all', () => {
+    const ws = makeWorksheet([
+      ['الموقع', 'اجمالى'],
+      ['موقع أ', 50000],
+    ])
+    expect(extractWorkbookGrandTotal(ws)).toBeNull()
+  })
+
+  it('returns null when no header row is found', () => {
+    expect(extractWorkbookGrandTotal(makeWorksheet([['no headers here']]))).toBeNull()
   })
 })
