@@ -91,7 +91,7 @@ export interface CommitBatchClient {
   activateBatch(batchId: string): Promise<void>
 }
 
-function toPayrollLineRow(
+export function toPayrollLineRow(
   batchId: string,
   siteId: string,
   periodYear: number,
@@ -166,6 +166,37 @@ export async function commitImportBatch(
   await client.activateBatch(batch.id)
 
   return { batchId: batch.id }
+}
+
+/**
+ * Commits a batch that was already persisted as a `processing` row (created
+ * up front by the parse step — see `POST /api/imports/parse` — so a dropped
+ * connection between parsing and review never loses the per-sheet report).
+ * Inserts the confirmed, site-resolved rows and activates the existing
+ * batch, without creating a second batch row. Used by the review UI's
+ * "confirm & activate" step (`POST /api/imports/confirm`).
+ */
+export async function activateExistingBatch(
+  client: CommitBatchClient,
+  batchId: string,
+  periodYear: number,
+  periodMonth: number,
+  sheets: CommitBatchSheetInput[],
+): Promise<{ batchId: string }> {
+  const lineRows: NewPayrollLineRow[] = []
+  for (const sheet of sheets) {
+    for (const row of sheet.rows) {
+      lineRows.push(toPayrollLineRow(batchId, sheet.siteId, periodYear, periodMonth, row))
+    }
+  }
+
+  if (lineRows.length > 0) {
+    await client.insertPayrollLines(lineRows)
+  }
+
+  await client.activateBatch(batchId)
+
+  return { batchId }
 }
 
 // Narrow structural shape of the supabase-js client methods this adapter

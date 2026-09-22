@@ -27,7 +27,28 @@ export async function proxy(request: NextRequest) {
 
   // IMPORTANT: refreshes the session and writes rotated tokens back to the
   // response cookies. Do not run any code between client creation and this call.
-  await supabase.auth.getUser()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  const { pathname } = request.nextUrl
+
+  // RLS is authenticated-only (no anonymous read policy anywhere), so an
+  // unauthenticated visitor to /dashboard/** would just see empty data with
+  // no explanation — redirect to /login instead. This is defense in depth
+  // alongside the per-layout check in src/app/dashboard/layout.tsx, not a
+  // replacement for it (see that Next.js data-security guidance: verify
+  // auth in the route itself, don't rely on proxy alone).
+  if (!user && pathname.startsWith('/dashboard')) {
+    const loginUrl = new URL('/login', request.url)
+    loginUrl.searchParams.set('next', pathname)
+    return NextResponse.redirect(loginUrl)
+  }
+
+  // Already signed in — no reason to show the login form again.
+  if (user && pathname === '/login') {
+    return NextResponse.redirect(new URL('/dashboard', request.url))
+  }
 
   return supabaseResponse
 }
