@@ -227,7 +227,51 @@ function parseDataRow(
     otherRowTexts,
   })
 
+  if (line.rowKind === 'subtotal') {
+    clearMappedFieldsForFreeformRow(line)
+  }
+
   return line
+}
+
+/**
+ * Confirmed by direct inspection of the real files: a subtotal row (e.g. a
+ * "supervision & admin staff" running total, or a group subtotal by
+ * worker's home governorate) does not follow the worker-row column grid at
+ * all — it's a label/value pair the accountant free-typed wherever there
+ * was room, not aligned to the sheet's own header columns. Reading it
+ * through the normal per-column field mapping (correct for every other row
+ * kind) lands arbitrary fragments of that freeform content into fields
+ * that assert a specific meaning — e.g. a stray number ending up under
+ * `overtimeHours` when it is actually that row's own subtotal amount,
+ * mislabeled. There is no reliable column to recover the real amount from
+ * (which one varies sheet to sheet), so rather than show a number that
+ * looks precise but means something else, every mapped field is cleared
+ * except the row's own label (kept as workerName) and identifying
+ * metadata. raw_row is untouched — the true content of every cell in this
+ * row stays fully inspectable there, just not asserted as structured data.
+ */
+function clearMappedFieldsForFreeformRow(line: ParsedPayrollLine): void {
+  line.workerNumber = null
+  line.attendanceDays = null
+  line.absenceDays = null
+  line.netDays = null
+  line.monthlyLeaveDays = null
+  line.annualLeaveDays = null
+  line.absenceNoPermissionDays = null
+  line.overtimeHours = null
+  line.lessHours = null
+  line.baseMonthlySalary = null
+  line.dailyWage = null
+  line.bonuses = null
+  line.transportationAmount = null
+  line.transportationCategory = null
+  line.advance = null
+  line.deductions = null
+  line.insurance = null
+  line.totalGross = null
+  line.netSalary = null
+  line.signatureNotes = null
 }
 
 function assignField(line: ParsedPayrollLine, field: CanonicalField, cellValue: unknown): void {

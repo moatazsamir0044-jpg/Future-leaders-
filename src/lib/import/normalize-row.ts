@@ -31,7 +31,15 @@ function arabicIndicToLatinDigits(input: string): string {
   return out
 }
 
-/** Coerces any cell value to a plain display string, trimmed. Never throws. */
+/** Coerces any cell value to a plain display string, trimmed. Never throws.
+ *
+ * Handles exceljs's full CellValue union, not just the shapes a normal
+ * worker row hits: a formula/shared-formula cell (`{formula, result?}` /
+ * `{sharedFormula, formula, result?}`) whose `result` is genuinely absent —
+ * confirmed present in the real files, on freeform subtotal-row cells that
+ * don't align to the worker-row grid — used to fall through every check
+ * here to the final `String(value)`, which for a plain object is the
+ * literal text "[object Object]", silently corrupting raw_row. */
 export function coerceText(value: unknown): string {
   if (value === null || value === undefined) return ''
   if (typeof value === 'string') return value.trim()
@@ -39,12 +47,25 @@ export function coerceText(value: unknown): string {
   if (value instanceof Date) return value.toISOString()
 
   if (typeof value === 'object') {
-    const obj = value as { result?: unknown; richText?: Array<{ text?: unknown }>; text?: unknown }
+    const obj = value as {
+      result?: unknown
+      richText?: Array<{ text?: unknown }>
+      text?: unknown
+      error?: unknown
+      formula?: unknown
+      sharedFormula?: unknown
+    }
     if (Array.isArray(obj.richText)) {
       return obj.richText.map((run) => (run && typeof run.text === 'string' ? run.text : '')).join('').trim()
     }
+    if (typeof obj.error === 'string') return obj.error
     if ('result' in obj) return coerceText(obj.result)
     if (typeof obj.text === 'string') return obj.text.trim()
+    // A formula/shared-formula cell with no `result` at all — exceljs
+    // never computed or cached one. There is no value to show; that's
+    // "genuinely blank", not "unparseable", so this is not a fallthrough
+    // to String(value).
+    if (typeof obj.formula === 'string' || typeof obj.sharedFormula === 'string') return ''
   }
 
   return String(value).trim()
@@ -63,11 +84,21 @@ export function coerceNumber(value: unknown): number | null {
   if (typeof value === 'boolean') return null
 
   if (typeof value === 'object') {
-    const obj = value as { result?: unknown; richText?: unknown }
+    const obj = value as {
+      result?: unknown
+      richText?: unknown
+      error?: unknown
+      formula?: unknown
+      sharedFormula?: unknown
+    }
+    if (typeof obj.error === 'string') return null
     if ('result' in obj) return coerceNumber(obj.result)
     if (Array.isArray((obj as { richText?: unknown }).richText)) {
       return coerceNumber(coerceText(value))
     }
+    // See coerceText: a formula cell with no cached result is genuinely
+    // blank, not unparseable text that happens to fail Number() below.
+    if (typeof obj.formula === 'string' || typeof obj.sharedFormula === 'string') return null
   }
 
   let text = coerceText(value)
