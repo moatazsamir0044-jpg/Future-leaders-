@@ -10,6 +10,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { RestoreBatchButton } from '@/components/imports/restore-batch-button'
+import { BatchWarnings } from '@/components/imports/batch-warnings'
 import type { TranslationKey } from '@/lib/i18n/get-dictionary'
 
 const STATUS_VARIANT: Record<string, 'default' | 'secondary' | 'outline' | 'destructive'> = {
@@ -68,20 +69,23 @@ export default async function ImportsPage() {
 
             return (
               <Card key={batch.id}>
-                <CardContent className="flex flex-wrap items-center justify-between gap-3 py-4">
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium" dir="auto">
-                        {scopeName}
-                      </span>
-                      <Badge variant={STATUS_VARIANT[batch.status]}>{t(STATUS_LABEL_KEY[batch.status])}</Badge>
+                <CardContent className="flex flex-col gap-3 py-4">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium" dir="auto">
+                          {scopeName}
+                        </span>
+                        <Badge variant={STATUS_VARIANT[batch.status]}>{t(STATUS_LABEL_KEY[batch.status])}</Badge>
+                      </div>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        {periodLabel(batch.period_year, batch.period_month, locale)} · {batch.source_filename} ·{' '}
+                        {new Date(batch.uploaded_at).toLocaleDateString(locale === 'ar' ? 'ar-EG-u-nu-latn' : 'en-US')}
+                      </p>
                     </div>
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      {periodLabel(batch.period_year, batch.period_month, locale)} · {batch.source_filename} ·{' '}
-                      {new Date(batch.uploaded_at).toLocaleDateString(locale === 'ar' ? 'ar-EG-u-nu-latn' : 'en-US')}
-                    </p>
+                    {batch.status === 'superseded' ? <RestoreBatchButton batchId={batch.id} /> : null}
                   </div>
-                  {batch.status === 'superseded' ? <RestoreBatchButton batchId={batch.id} /> : null}
+                  <BatchWarnings warnings={batch.warnings} locale={locale} />
                 </CardContent>
               </Card>
             )
