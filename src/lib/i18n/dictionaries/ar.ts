@@ -171,6 +171,9 @@ const ar: Record<keyof typeof en, string> = {
   'imports.rowKindNonWorkerCost': 'صفوف تكلفة غير عمالة',
   'imports.rowKindUnknown': 'صفوف غير مصنّفة',
   'imports.totalCrossCheckWarning': 'مطابقة الإجمالي',
+  'imports.warningsClean': 'لا توجد فروقات',
+  'imports.warningsSummary': 'تنبيه — اضغط للعرض',
+  'imports.warningsCrossCheckBadge': 'مطابقة',
 }
 
 export default ar

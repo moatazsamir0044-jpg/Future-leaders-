@@ -169,6 +169,9 @@ const en = {
   'imports.rowKindNonWorkerCost': 'non-worker cost rows',
   'imports.rowKindUnknown': 'unclassified rows',
   'imports.totalCrossCheckWarning': 'Totals cross-check',
+  'imports.warningsClean': 'No discrepancies flagged',
+  'imports.warningsSummary': 'warning(s) found — click to view',
+  'imports.warningsCrossCheckBadge': 'Cross-check',
 } as const
 
 export default en
