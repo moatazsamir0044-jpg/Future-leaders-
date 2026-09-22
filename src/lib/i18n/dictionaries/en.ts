@@ -114,6 +114,8 @@ const en = {
   'records.rowKind.non_worker_cost': 'Non-worker cost',
   'records.rowKind.unknown': 'Unclassified',
   'records.knownLimitation': "Worker numbers aren't stable across files — cross-month lookups rely on name matching only.",
+  'records.detail.subtotalNote':
+    "This is a subtotal line from the source sheet, not an individual worker — its own amount isn't reliably in the same column from sheet to sheet, so it isn't shown as a figure here. Use \"Show raw row (JSON)\" below to see exactly what this row contained.",
 
   // ── Imports ───────────────────────────────────────────────────────────────
   'imports.title': 'Imports',

@@ -64,6 +64,10 @@ export function RowDetailDialog({
           </span>
         </div>
 
+        {row.row_kind === 'subtotal' ? (
+          <p className="border-t pt-4 text-sm text-muted-foreground">{t('records.detail.subtotalNote')}</p>
+        ) : null}
+
         <div className="grid grid-cols-2 gap-x-4 gap-y-3 border-t pt-4 sm:grid-cols-3">
           <Field label={t('records.col.workerNumber')} value={row.worker_number} dir="ltr" />
           <Field label={t('records.col.site')} value={locale === 'ar' ? row.pv_sites?.name_ar ?? null : row.pv_sites?.name_en ?? row.pv_sites?.name_ar ?? null} dir="auto" />
