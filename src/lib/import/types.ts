@@ -38,6 +38,11 @@ export type NumericCanonicalField = Exclude<
 
 export type RowKind = 'worker' | 'subtotal' | 'non_worker_cost' | 'unknown'
 
+/** All RowKind values, in the order the UI presents them. Single source of
+ * truth so the records filter dropdown and its query-param parsing can't
+ * silently drift apart from each other. */
+export const ROW_KINDS: RowKind[] = ['worker', 'subtotal', 'non_worker_cost', 'unknown']
+
 /** One column header as found in the sheet: its literal text and 1-based
  * column index. Column order varies between files (the Futtaim file, for
  * instance, orders its columns differently from the zone workbooks) — every
