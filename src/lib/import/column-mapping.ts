@@ -22,8 +22,15 @@ import type { CanonicalField, ColumnMapping, DetectedHeader } from './types'
 export const HEADER_ALIASES: Record<CanonicalField, string[]> = {
   worker_number: ['رقم العامل', 'رقم', 'الرقم', 'كود العامل', 'كود'],
   worker_name: ['الاسم', 'اسم العامل', 'اسم الموظف', 'الأسم'],
-  // real export: 'عدد أيام الحضور'
-  attendance_days: ['عدد أيام الحضور', 'ايام الحضور', 'أيام الحضور', 'الحضور'],
+  // real export: 'عدد أيام الحضور'. The زone workbooks' own header (confirmed
+  // by direct parse of the real اكتوبر zone file) instead reads 'عدد ايام
+  // حضور' — no hamza on 'ايام', and 'حضور' without the 'ال' article that
+  // the export module's version has. Both are the same field; this was an
+  // exact-match miss on every sheet until confirmed against a real import.
+  attendance_days: [
+    'عدد أيام الحضور', 'عدد ايام حضور', 'عدد ايام الحضور',
+    'ايام الحضور', 'أيام الحضور', 'ايام حضور', 'أيام حضور', 'الحضور',
+  ],
   // real export: 'الغياب'
   absence_days: ['الغياب', 'ايام الغياب', 'أيام الغياب'],
   // real export: 'صافى الايام'
