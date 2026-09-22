@@ -115,7 +115,7 @@ const en = {
   'records.rowKind.unknown': 'Unclassified',
   'records.knownLimitation': "Worker numbers aren't stable across files — cross-month lookups rely on name matching only.",
   'records.detail.subtotalNote':
-    "This is a subtotal line from the source sheet, not an individual worker — its own amount isn't reliably in the same column from sheet to sheet, so it isn't shown as a figure here. Use \"Show raw row (JSON)\" below to see exactly what this row contained.",
+    "This is a subtotal line from the source sheet (e.g. a transport-shift or staff group total), not an individual worker — most fields below don't apply to it and are blank. Net salary and total gross are recovered from the sheet's own subtotal figures where present. Use \"Show raw row (JSON)\" below to see exactly what this row contained.",
 
   // ── Imports ───────────────────────────────────────────────────────────────
   'imports.title': 'Imports',
