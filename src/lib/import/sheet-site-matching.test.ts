@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { proposeSiteForSheet, type SiteLookup, type SiteRecord } from './sheet-site-matching'
+import { buildSuggestedSiteName, proposeSiteForSheet, type SiteLookup, type SiteRecord } from './sheet-site-matching'
 
 function makeSite(overrides: Partial<SiteRecord> = {}): SiteRecord {
   return { id: 's1', zoneId: 'z1', nameAr: 'زهراء المعادي', sheetKey: 'zahraa-maadi', ...overrides }
@@ -69,5 +69,38 @@ describe('proposeSiteForSheet', () => {
 
     const proposal = await proposeSiteForSheet(lookup, { zoneId: null }, 'Futtaim Admin Buildings')
     expect(proposal.kind).toBe('create_new')
+  })
+
+  it('includes the workbook site-name hint in the suggested name for a new site', async () => {
+    const lookup: SiteLookup = {
+      async findBySheetKey() {
+        return null
+      },
+      async findSimilarByName() {
+        return []
+      },
+    }
+
+    const proposal = await proposeSiteForSheet(lookup, { zoneId: 'z1' }, 'MOE HK', 'مول مصر')
+    expect(proposal).toEqual({ kind: 'create_new', suggestedNameAr: 'مول مصر (MOE HK)' })
+  })
+})
+
+describe('buildSuggestedSiteName', () => {
+  it('combines the hint and sheet name so two sheets sharing one hint never collide', () => {
+    // Confirmed real case: seven منطقة اكتوبر sheets all carry the
+    // identical "الموقع / مول مصر" label — the sheet name is what keeps
+    // their proposed names distinct.
+    expect(buildSuggestedSiteName('MOE HK', 'مول مصر')).toBe('مول مصر (MOE HK)')
+    expect(buildSuggestedSiteName('Magic', 'مول مصر')).toBe('مول مصر (Magic)')
+    expect(buildSuggestedSiteName('MOE HK', 'مول مصر')).not.toBe(buildSuggestedSiteName('Magic', 'مول مصر'))
+  })
+
+  it('falls back to the bare sheet name when there is no hint', () => {
+    expect(buildSuggestedSiteName('Asema', null)).toBe('Asema')
+  })
+
+  it('trims the sheet name', () => {
+    expect(buildSuggestedSiteName('  Z Park  ', null)).toBe('Z Park')
   })
 })

@@ -40,7 +40,7 @@ async function buildFixtureWorkbook(): Promise<Buffer> {
   //    subtotal row, and a non-worker cost row mixed into the worker list ──
   const siteA = workbook.addWorksheet('SiteA')
   setRow(siteA, 1, ['شركة بروفشنال ليدرز'])
-  setRow(siteA, 2, ['مرتبات شهر يوليو'])
+  setRow(siteA, 2, ['مرتبات شهر يوليو', 'الموقع / مول تجريبى'])
   setRow(siteA, 3, ['رقم', 'الاسم', 'الراتب الشهرى', 'الاجمالى'])
   setRow(siteA, 4, ['1', 'محمد أحمد', 3000, 3200])
   // row 5 intentionally left untouched: a blank filler row
@@ -87,6 +87,12 @@ describe('parseWorkbook', () => {
     const result = await parseWorkbook(await buildFixtureWorkbook())
     expect(sheetByName(result, 'SiteA').headerRowNumber).toBe(3)
     expect(sheetByName(result, 'SiteB').headerRowNumber).toBe(1)
+  })
+
+  it('extracts the workbook\'s own الموقع site-name hint when present, and is null when the header sits at row 1 with no title rows above it', async () => {
+    const result = await parseWorkbook(await buildFixtureWorkbook())
+    expect(sheetByName(result, 'SiteA').siteNameHint).toBe('مول تجريبى')
+    expect(sheetByName(result, 'SiteB').siteNameHint).toBeNull()
   })
 
   it('skips a blank filler row without ending the sheet, classifies an embedded subtotal row and a non-worker cost row, and never drops a row', async () => {

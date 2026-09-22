@@ -1,5 +1,5 @@
 import ExcelJS from 'exceljs'
-import { detectHeaderRow, type WorksheetLike } from './header-detection'
+import { detectHeaderRow, extractSiteNameHint, type WorksheetLike } from './header-detection'
 import { buildColumnMapping } from './column-mapping'
 import { findSheetDataRange } from './end-of-sheet'
 import { classifyRow } from './row-classifier'
@@ -104,6 +104,7 @@ function emptySheetResult(sheetName: string, warnings: string[]): SheetParseResu
     sheetName,
     headerFound: false,
     headerRowNumber: null,
+    siteNameHint: null,
     rows: [],
     unmappedHeaders: [],
     rowCountsByKind: { ...EMPTY_ROW_COUNTS },
@@ -131,6 +132,7 @@ function parseSheet(worksheet: WorksheetLike, sheetName: string, totalsFigures: 
 
   const mapping = buildColumnMapping(detected.headers)
   const range = findSheetDataRange(worksheet, detected.headerRowNumber)
+  const siteNameHint = extractSiteNameHint(worksheet, detected.headerRowNumber)
 
   const rows = range.dataRowNumbers.map((rowNumber) =>
     parseDataRow(worksheet, rowNumber, sheetName, detected.headers, mapping),
@@ -156,6 +158,7 @@ function parseSheet(worksheet: WorksheetLike, sheetName: string, totalsFigures: 
     sheetName,
     headerFound: true,
     headerRowNumber: detected.headerRowNumber,
+    siteNameHint,
     rows,
     unmappedHeaders: unmappedHeaderTexts,
     rowCountsByKind,

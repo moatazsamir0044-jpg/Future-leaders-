@@ -1,5 +1,5 @@
 import { coerceText } from './normalize-row'
-import { normalizeForCompare } from './normalize-arabic'
+import { normalizeArabic, normalizeForCompare } from './normalize-arabic'
 import type { DetectedHeader, HeaderDetectionResult } from './types'
 
 // Minimal structural shape this module needs from an exceljs Worksheet/Row.
@@ -61,6 +61,45 @@ export function detectHeaderRow(
 
     if (hasNameToken && hasNumberToken && headers.length > 0) {
       return { headerRowNumber: rowNumber, headers }
+    }
+  }
+
+  return null
+}
+
+const SITE_LABEL_TOKEN = normalizeForCompare('الموقع')
+
+/**
+ * Extracts the workbook's own "الموقع / X" site-name cell from the title
+ * block above the header row, if present. This is a HINT, not a reliable
+ * unique identifier: confirmed by direct inspection of the real files, this
+ * label is shared verbatim by several distinct sheets within one workbook
+ * (e.g. seven different منطقة اكتوبر sheets all say 'الموقع / مول مصر' —
+ * they're different tenants/cost-centers at the same mall). Callers must
+ * combine this with the sheet's own tab name (which is always distinct) to
+ * get a usable, non-colliding proposed site name — never use this alone.
+ */
+export function extractSiteNameHint(worksheet: WorksheetLike, headerRowNumber: number): string | null {
+  const lastRowToScan = Math.max(0, Math.min(worksheet.rowCount, headerRowNumber - 1))
+
+  for (let rowNumber = 1; rowNumber <= lastRowToScan; rowNumber++) {
+    const row = worksheet.getRow(rowNumber)
+    const colCount = row.cellCount
+    if (colCount <= 0) continue
+
+    for (let col = 1; col <= colCount; col++) {
+      const rawText = coerceText(row.getCell(col).value)
+      if (!rawText) continue
+      if (!normalizeForCompare(rawText).includes(SITE_LABEL_TOKEN)) continue
+
+      // Cell is typically literally "الموقع / <name>" in one string; take
+      // whatever follows the label and its separator. If there's no "/"
+      // (format drift), fall back to the whole cell with the label word
+      // itself stripped, rather than discarding a hint that's present but
+      // not in the expected shape.
+      const afterSlash = rawText.split('/')[1]
+      const candidate = normalizeArabic(afterSlash ?? rawText.replace(/الموقع/g, ''))
+      if (candidate) return candidate
     }
   }
 

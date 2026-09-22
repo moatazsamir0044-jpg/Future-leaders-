@@ -107,7 +107,9 @@ export async function POST(request: Request) {
 
   const sheets: ParseResponseSheet[] = []
   for (const sheet of parsed.sheets) {
-    const proposal = sheet.headerFound ? await proposeSiteForSheet(siteLookup, matchScope, sheet.sheetName) : null
+    const proposal = sheet.headerFound
+      ? await proposeSiteForSheet(siteLookup, matchScope, sheet.sheetName, sheet.siteNameHint)
+      : null
     sheets.push({
       sheetName: sheet.sheetName,
       headerFound: sheet.headerFound,

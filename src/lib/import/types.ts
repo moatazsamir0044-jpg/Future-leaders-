@@ -111,6 +111,11 @@ export interface SheetParseResult {
    * can surface it. */
   headerFound: boolean
   headerRowNumber: number | null
+  /** The workbook's own "الموقع / X" label, if found above the header row.
+   * Not unique on its own (several sheets can share it — see
+   * header-detection.ts) — combine with sheetName for a proposed site name
+   * that's both human-readable and guaranteed not to collide. */
+  siteNameHint: string | null
   rows: ParsedPayrollLine[]
   unmappedHeaders: string[]
   rowCountsByKind: Record<RowKind, number>

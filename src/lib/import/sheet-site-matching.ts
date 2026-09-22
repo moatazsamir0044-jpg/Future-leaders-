@@ -42,16 +42,38 @@ export type SiteMatchProposal =
 const SIMILARITY_THRESHOLD = 0.4
 
 /**
+ * Builds the proposed name for a newly-created site: the workbook's own
+ * "الموقع / X" label plus the sheet tab name, e.g. "مول مصر (MOE HK)".
+ *
+ * The hint alone is not safe to use as-is — confirmed by direct inspection
+ * of the real files, several distinct sheets in the same workbook can share
+ * the identical "الموقع" label (seven منطقة اكتوبر sheets all say "مول
+ * مصر"; two others both say "اركان بلازا"). The sheet tab name is always
+ * distinct, so appending it guarantees two different sheets never propose
+ * the same name even when the human-readable hint collides. Falls back to
+ * the bare sheet name when no hint was found in the workbook at all.
+ */
+export function buildSuggestedSiteName(sheetName: string, siteNameHint: string | null): string {
+  const trimmedSheetName = sheetName.trim()
+  if (!siteNameHint) return trimmedSheetName
+  return `${siteNameHint} (${trimmedSheetName})`
+}
+
+/**
  * Proposes a site for the given sheet tab name, within the given scope
  * (a zone, or the standalone-site scope when zoneId is null). Tries an
  * exact sheet_key match first (a sheet re-imported against the same site it
  * was matched to before), then the best trigram name match above the
- * threshold, then falls back to "create new site".
+ * threshold, then falls back to "create new site". Matching itself is
+ * always keyed on the sheet tab name (stable across months, confirmed by
+ * direct inspection) — siteNameHint only affects the suggested name shown
+ * for a brand-new site, never the matching logic.
  */
 export async function proposeSiteForSheet(
   lookup: SiteLookup,
   scope: SiteMatchScope,
   sheetName: string,
+  siteNameHint: string | null = null,
 ): Promise<SiteMatchProposal> {
   const trimmedName = sheetName.trim()
 
@@ -65,7 +87,7 @@ export async function proposeSiteForSheet(
 
   if (best) return { kind: 'name_similarity_match', site: best.site, similarity: best.similarity }
 
-  return { kind: 'create_new', suggestedNameAr: trimmedName }
+  return { kind: 'create_new', suggestedNameAr: buildSuggestedSiteName(trimmedName, siteNameHint) }
 }
 
 // Narrow structural shape of the supabase-js client methods this adapter
