@@ -27,6 +27,27 @@ describe('coerceText', () => {
   it('extracts text from a hyperlink cell value', () => {
     expect(coerceText({ text: 'ملاحظة', hyperlink: 'https://example.test' })).toBe('ملاحظة')
   })
+
+  it('extracts the result from a shared-formula cell value', () => {
+    expect(coerceText({ sharedFormula: 'A1', formula: 'B1+B2', result: 5000 })).toBe('5000')
+  })
+
+  it('returns empty string, not "[object Object]", for a formula cell with no cached result', () => {
+    // Confirmed present in the real files: a shared-formula cell exceljs
+    // never computed/cached a result for. Before this was fixed it fell
+    // through every check to String(value), producing the literal text
+    // "[object Object]" — silently corrupting raw_row.
+    expect(coerceText({ sharedFormula: 'A1', formula: 'B1+B2' })).toBe('')
+    expect(coerceText({ formula: 'B1+B2' })).toBe('')
+  })
+
+  it('returns the error code for a formula error cell', () => {
+    expect(coerceText({ error: '#DIV/0!' })).toBe('#DIV/0!')
+  })
+
+  it('unwraps an error result nested inside a formula cell', () => {
+    expect(coerceText({ formula: 'A1/B1', result: { error: '#DIV/0!' } })).toBe('#DIV/0!')
+  })
 })
 
 describe('coerceNumber', () => {
@@ -64,6 +85,15 @@ describe('coerceNumber', () => {
   it('returns null for a boolean cell', () => {
     expect(coerceNumber(true)).toBeNull()
   })
+
+  it('returns null, not NaN, for a formula cell with no cached result', () => {
+    expect(coerceNumber({ sharedFormula: 'A1', formula: 'B1+B2' })).toBeNull()
+  })
+
+  it('returns null for a formula error cell', () => {
+    expect(coerceNumber({ error: '#DIV/0!' })).toBeNull()
+    expect(coerceNumber({ formula: 'A1/B1', result: { error: '#DIV/0!' } })).toBeNull()
+  })
 })
 
 describe('toRawJsonValue', () => {
@@ -78,5 +108,13 @@ describe('toRawJsonValue', () => {
 
   it('keeps non-blank text as a trimmed string', () => {
     expect(toRawJsonValue('  محمد  ')).toBe('محمد')
+  })
+
+  it('never stores the literal text "[object Object]" for an uncomputed shared-formula cell', () => {
+    // This is what raw_row actually calls (parse-workbook.ts) — the
+    // regression this whole file is guarding against showed up here, not
+    // in coerceText's own unit tests, since raw_row is what a user sees
+    // when they inspect a row's real content.
+    expect(toRawJsonValue({ sharedFormula: 'A1', formula: 'B1+B2' })).toBeNull()
   })
 })

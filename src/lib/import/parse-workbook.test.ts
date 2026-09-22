@@ -122,6 +122,30 @@ describe('parseWorkbook', () => {
     expect(bySourceRow.has(10)).toBe(false)
   })
 
+  it('clears the mapped structured fields on a subtotal row but keeps its label and raw_row intact', async () => {
+    // Confirmed against the real files: a subtotal row's own amount does
+    // not land in a fixed column (it varies sheet to sheet), so a value
+    // that happens to fall under e.g. الاجمالى in one sheet's grid is not
+    // safe to assert as that row's total_gross — it would show as a
+    // precise-looking but meaningless number (a real case: a subtotal row's
+    // total showed up under "overtime hours"). Every mapped field is
+    // cleared except the row's own label, kept as workerName.
+    const result = await parseWorkbook(await buildFixtureWorkbook())
+    const siteA = sheetByName(result, 'SiteA')
+    const subtotalRow = siteA.rows.find((r) => r.sourceRowNumber === 7)!
+
+    expect(subtotalRow.rowKind).toBe('subtotal')
+    expect(subtotalRow.workerName).toBe('اجمالي الفريق الأول')
+    expect(subtotalRow.totalGross).toBeNull()
+    expect(subtotalRow.netSalary).toBeNull()
+    expect(subtotalRow.baseMonthlySalary).toBeNull()
+    expect(subtotalRow.workerNumber).toBeNull()
+
+    // raw_row is untouched — the real content of every cell in this row
+    // stays fully inspectable, just not asserted as structured data.
+    expect(subtotalRow.rawRow['الاجمالى']).toBe(6200)
+  })
+
   it('preserves the full original row in raw_row, keyed by literal header text, including for an unmapped column', async () => {
     const result = await parseWorkbook(await buildFixtureWorkbook())
     const siteA = sheetByName(result, 'SiteA')
