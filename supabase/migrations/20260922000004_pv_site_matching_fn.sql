@@ -24,13 +24,20 @@ returns table (
 language sql
 stable
 as $$
+  -- Schema-qualified: a plain `language sql` function has its body resolved
+  -- at CREATE time (unlike plpgsql, which only checks syntax), so this
+  -- fails immediately on a database whose search_path doesn't happen to
+  -- include the extensions schema — true of a from-scratch CI database,
+  -- even though it worked unqualified on the live Supabase project (which
+  -- puts `extensions` on the default search_path). Caught by CI running
+  -- this migration against a fresh Postgres container.
   select s.id, s.zone_id, s.name_ar, s.sheet_key,
-         similarity(s.name_ar, p_name) as similarity
+         extensions.similarity(s.name_ar, p_name) as similarity
   from public.pv_sites s
   where
     (p_zone_id is null and s.zone_id is null)
     or (p_zone_id is not null and s.zone_id = p_zone_id)
-  order by similarity(s.name_ar, p_name) desc
+  order by extensions.similarity(s.name_ar, p_name) desc
   limit greatest(p_limit, 1);
 $$;
 
