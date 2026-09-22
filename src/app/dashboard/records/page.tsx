@@ -6,7 +6,7 @@ import { listSites, listZones } from '@/lib/queries/sites-zones'
 import { searchPayrollLines } from '@/lib/queries/payroll-lines'
 import { FiltersBar } from '@/components/records/filters-bar'
 import { RecordsTable } from '@/components/records/records-table'
-import type { RowKind } from '@/lib/import/types'
+import { ROW_KINDS, type RowKind } from '@/lib/import/types'
 
 const PAGE_SIZE = 50
 
@@ -29,6 +29,10 @@ export default async function RecordsPage({
   const year = typeof params.year === 'string' ? Number(params.year) : undefined
   const month = typeof params.month === 'string' ? Number(params.month) : undefined
   const page = typeof params.page === 'string' ? Math.max(1, Number(params.page) || 1) : 1
+  const kind =
+    typeof params.kind === 'string' && (ROW_KINDS as string[]).includes(params.kind)
+      ? (params.kind as RowKind)
+      : undefined
 
   const [zones, sites, data] = await Promise.all([
     listZones(supabase),
@@ -39,7 +43,7 @@ export default async function RecordsPage({
       workerName: worker,
       periodYear: year,
       periodMonth: month,
-      rowKind: undefined as RowKind | undefined,
+      rowKind: kind,
       page,
       pageSize: PAGE_SIZE,
     }),

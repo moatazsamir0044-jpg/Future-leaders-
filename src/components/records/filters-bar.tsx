@@ -8,6 +8,8 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import type { SiteOption, ZoneOption } from '@/lib/queries/sites-zones'
+import { ROW_KINDS } from '@/lib/import/types'
+import type { TranslationKey } from '@/lib/i18n/get-dictionary'
 
 const CURRENT_YEAR = new Date().getFullYear()
 const YEARS = [CURRENT_YEAR + 1, CURRENT_YEAR, CURRENT_YEAR - 1, CURRENT_YEAR - 2]
@@ -23,6 +25,7 @@ export function FiltersBar({ zones, sites }: { zones: ZoneOption[]; sites: SiteO
   const siteParam = searchParams.get('site') ?? ''
   const yearParam = searchParams.get('year') ?? ''
   const monthParam = searchParams.get('month') ?? ''
+  const kindParam = searchParams.get('kind') ?? ''
   const [workerName, setWorkerName] = useState(searchParams.get('worker') ?? '')
 
   const monthFmt = useMemo(
@@ -57,7 +60,7 @@ export function FiltersBar({ zones, sites }: { zones: ZoneOption[]; sites: SiteO
   })
 
   return (
-    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
+    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-6">
       <div className="flex flex-col gap-1.5 lg:col-span-2">
         <Label htmlFor="worker-search">{t('records.worker')}</Label>
         <div className="relative">
@@ -105,6 +108,23 @@ export function FiltersBar({ zones, sites }: { zones: ZoneOption[]; sites: SiteO
             {sitesForZone.map((s) => (
               <SelectItem key={s.id} value={s.id}>
                 <span dir="auto">{locale === 'ar' ? s.nameAr : (s.nameEn ?? s.nameAr)}</span>
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div className="flex flex-col gap-1.5">
+        <Label>{t('records.rowKind')}</Label>
+        <Select value={kindParam || 'all'} onValueChange={(v) => updateParams({ kind: v === 'all' ? null : v })}>
+          <SelectTrigger className="w-full">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">{t('common.all')}</SelectItem>
+            {ROW_KINDS.map((k) => (
+              <SelectItem key={k} value={k}>
+                {t(`records.rowKind.${k}` as TranslationKey)}
               </SelectItem>
             ))}
           </SelectContent>
