@@ -271,3 +271,66 @@ describe('parseWorkbook — subtotal amount recovery', () => {
     expect(subtotal.totalGross).toBeNull()
   })
 })
+
+describe('parseWorkbook — workbook-wide grand-total cross-check', () => {
+  // Prompted by a real case: a التجمع zone import where per-site summed
+  // worker advances (98,268) ran roughly double the workbook's own
+  // reported advance total (47,390). The per-sheet gross cross-check
+  // couldn't have caught this even for gross — it matches by exact sheet
+  // tab name against the Total tab's own site-name column, and those
+  // never actually agree on either real workbook (confirmed by direct
+  // inspection: zero overlap). This check sidesteps that: one grand-total
+  // row, no per-site name matching, checked against a sum across every
+  // sheet in the workbook.
+  async function buildGrandTotalMismatchWorkbook(): Promise<Buffer> {
+    const workbook = new ExcelJS.Workbook()
+
+    const total = workbook.addWorksheet('Total')
+    setRow(total, 1, ['الموقع', 'الاجمالى', 'تامينات', 'استقطاعات', 'سلف'])
+    setRow(total, 2, ['أي اسم لا يطابق اسم أي شيت', 3000, 0, 0, 500])
+    // The grand-total row: gross matches what the sheets will sum to
+    // (3000), but the reported advance (500) is well under what the real
+    // worker rows carry (2000) — the exact shape of the real finding.
+    setRow(total, 3, ['الاجمالى', 3000, 0, 0, 500])
+
+    const site = workbook.addWorksheet('SiteY')
+    setRow(site, 1, ['رقم', 'الاسم', 'الاجمالى', 'سلف'])
+    setRow(site, 2, ['1', 'محمد', 3000, 2000])
+    setRow(site, 3, ['اجماليات', '', 3000, 2000])
+
+    const buffer = await workbook.xlsx.writeBuffer()
+    return Buffer.from(buffer)
+  }
+
+  it('warns at the workbook level when a summed field diverges from the grand-total row, even though gross matches', async () => {
+    const result = await parseWorkbook(await buildGrandTotalMismatchWorkbook())
+
+    const workbookWarning = result.warnings.find(
+      (w) => w.sheetName === '(workbook total)' && w.message.includes('advance'),
+    )
+    expect(workbookWarning?.message).toMatch(/does not match/)
+    expect(workbookWarning?.message).toMatch(/2000\.00/)
+    expect(workbookWarning?.message).toMatch(/500\.00/)
+
+    // Gross genuinely matches (3000 both sides) — no false positive there.
+    expect(
+      result.warnings.some((w) => w.sheetName === '(workbook total)' && w.message.includes('total_gross')),
+    ).toBe(false)
+  })
+
+  it('produces no workbook-level warning when everything reconciles', async () => {
+    const workbook = new ExcelJS.Workbook()
+    const total = workbook.addWorksheet('Total')
+    setRow(total, 1, ['الموقع', 'الاجمالى', 'سلف'])
+    setRow(total, 2, ['أي موقع', 3000, 2000])
+    setRow(total, 3, ['الاجمالى', 3000, 2000])
+    const site = workbook.addWorksheet('SiteZ')
+    setRow(site, 1, ['رقم', 'الاسم', 'الاجمالى', 'سلف'])
+    setRow(site, 2, ['1', 'محمد', 3000, 2000])
+    setRow(site, 3, ['اجماليات', '', 3000, 2000])
+    const buffer = Buffer.from(await workbook.xlsx.writeBuffer())
+
+    const result = await parseWorkbook(buffer)
+    expect(result.warnings.some((w) => w.sheetName === '(workbook total)')).toBe(false)
+  })
+})
