@@ -73,5 +73,11 @@ begin
 end;
 $$;
 
-revoke all on function public.pv_activate_import_batch(uuid) from public;
+-- Supabase's own ALTER DEFAULT PRIVILEGES grants EXECUTE on every new
+-- public-schema function directly to anon/authenticated/service_role (not
+-- via PUBLIC) at creation time. `revoke ... from public` alone never
+-- touches that — PUBLIC and a named role are separate grantees in
+-- Postgres's ACL system — so it must be revoked from anon by name too.
+-- Caught by the live RLS test suite: anon really could execute this.
+revoke all on function public.pv_activate_import_batch(uuid) from public, anon, authenticated;
 grant execute on function public.pv_activate_import_batch(uuid) to authenticated;

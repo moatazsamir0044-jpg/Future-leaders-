@@ -41,5 +41,8 @@ as $$
   limit greatest(p_limit, 1);
 $$;
 
-revoke all on function public.pv_match_sites_by_name(uuid, text, integer) from public;
+-- Same fix as pv_activate_import_batch: Supabase grants EXECUTE directly to
+-- anon/authenticated/service_role at function-creation time (not via
+-- PUBLIC), so `revoke ... from public` alone doesn't remove it.
+revoke all on function public.pv_match_sites_by_name(uuid, text, integer) from public, anon, authenticated;
 grant execute on function public.pv_match_sites_by_name(uuid, text, integer) to authenticated;
